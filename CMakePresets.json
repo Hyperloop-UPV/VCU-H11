@@ -1,0 +1,320 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "mcu",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "toolchainFile": "${sourceDir}/toolchains/stm32.cmake",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "sim",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "installDir": "${sourceDir}/out/install/${presetName}",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "nucleo-debug",
+            "displayName": "Nucleo [DBG]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "TARGET_NUCLEO": "ON"
+            }
+        },
+        {
+            "name": "nucleo-release",
+            "displayName": "Nucleo [REL]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "TARGET_NUCLEO": "ON"
+            }
+        },
+        {
+            "name": "nucleo-relwithdebinfo",
+            "displayName": "Nucleo [RWD]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "TARGET_NUCLEO": "ON"
+            }
+        },
+        {
+            "name": "nucleo-debug-eth",
+            "displayName": "Nucleo [DBG] [ETH]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "TARGET_NUCLEO": "ON",
+                "USE_ETHERNET": "ON"
+            }
+        },
+        {
+            "name": "nucleo-release-eth",
+            "displayName": "Nucleo [REL] [ETH]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "TARGET_NUCLEO": "ON",
+                "USE_ETHERNET": "ON"
+            }
+        },
+        {
+            "name": "nucleo-relwithdebinfo-eth",
+            "displayName": "Nucleo [RWD] [ETH]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "TARGET_NUCLEO": "ON",
+                "USE_ETHERNET": "ON"
+            }
+        },
+        {
+            "name": "board-debug",
+            "displayName": "Board [DBG]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "board-release",
+            "displayName": "Board [REL]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "board-relwithdebinfo",
+            "displayName": "Board [RWD]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        },
+        {
+            "name": "board-debug-eth-ksz8041",
+            "displayName": "Board [DBG] [ETH] [KSZ8041]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "KSZ8041"
+            }
+        },
+        {
+            "name": "board-debug-eth-lan8700",
+            "displayName": "Board [DBG] [ETH] [LAN8700]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "LAN8700"
+            }
+        },
+        {
+            "name": "board-release-eth-ksz8041",
+            "displayName": "Board [REL] [ETH] [KSZ8041]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "KSZ8041"
+            }
+        },
+        {
+            "name": "board-release-eth-lan8700",
+            "displayName": "Board [REL] [ETH] [LAN8700]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "LAN8700"
+            }
+        },
+        {
+            "name": "board-relwithdebinfo-eth-ksz8041",
+            "displayName": "Board [RWD] [ETH] [KSZ8041]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "KSZ8041"
+            }
+        },
+        {
+            "name": "board-relwithdebinfo-eth-lan8700",
+            "displayName": "Board [RWD] [ETH] [LAN8700]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "LAN8700"
+            }
+        },
+        {
+            "name": "simulator",
+            "displayName": "Simulator",
+            "inherits": [
+                "sim"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "simulator-asan",
+            "displayName": "Simulator [ASAN+UBSAN]",
+            "inherits": [
+                "sim"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "STLIB_ENABLE_SANITIZERS": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "nucleo-debug",
+            "configurePreset": "nucleo-debug"
+        },
+        {
+            "name": "nucleo-release",
+            "configurePreset": "nucleo-release"
+        },
+        {
+            "name": "nucleo-relwithdebinfo",
+            "configurePreset": "nucleo-relwithdebinfo"
+        },
+        {
+            "name": "nucleo-debug-eth",
+            "configurePreset": "nucleo-debug-eth"
+        },
+        {
+            "name": "nucleo-release-eth",
+            "configurePreset": "nucleo-release-eth"
+        },
+        {
+            "name": "nucleo-relwithdebinfo-eth",
+            "configurePreset": "nucleo-relwithdebinfo-eth"
+        },
+        {
+            "name": "board-debug",
+            "configurePreset": "board-debug"
+        },
+        {
+            "name": "board-release",
+            "configurePreset": "board-release"
+        },
+        {
+            "name": "board-relwithdebinfo",
+            "configurePreset": "board-relwithdebinfo"
+        },
+        {
+            "name": "board-debug-eth-ksz8041",
+            "configurePreset": "board-debug-eth-ksz8041"
+        },
+        {
+            "name": "board-debug-eth-lan8700",
+            "configurePreset": "board-debug-eth-lan8700"
+        },
+        {
+            "name": "board-release-eth-ksz8041",
+            "configurePreset": "board-release-eth-ksz8041"
+        },
+        {
+            "name": "board-release-eth-lan8700",
+            "configurePreset": "board-release-eth-lan8700"
+        },
+        {
+            "name": "board-relwithdebinfo-eth-ksz8041",
+            "configurePreset": "board-relwithdebinfo-eth-ksz8041"
+        },
+        {
+            "name": "board-relwithdebinfo-eth-lan8700",
+            "configurePreset": "board-relwithdebinfo-eth-lan8700"
+        },
+        {
+            "name": "simulator",
+            "configurePreset": "simulator"
+        },
+        {
+            "name": "simulator-asan",
+            "configurePreset": "simulator-asan"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "simulator-all",
+            "configurePreset": "simulator",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error"
+            }
+        },
+        {
+            "name": "simulator-adc",
+            "inherits": "simulator-all",
+            "filter": {
+                "include": {
+                    "name": "ADCTest"
+                }
+            }
+        },
+        {
+            "name": "simulator-all-asan",
+            "configurePreset": "simulator-asan",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error"
+            }
+        }
+    ]
+}
