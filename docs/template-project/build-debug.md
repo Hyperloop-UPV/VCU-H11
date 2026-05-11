@@ -21,10 +21,10 @@ With sanitizers:
 
 ## 3. Build for MCU
 
-Example:
+VCU board build:
 
 ```sh
-./hyper build main --preset board-debug-eth-ksz8041 --board-name TEST
+./hyper build main --preset board-debug-eth-ksz8041 --board-name VCU
 ```
 
 The build output is copied to:
@@ -55,9 +55,3 @@ Useful tasks in `.vscode/tasks.json`:
 - `MCU | OpenOCD | Start Server`
 - `MCU | OpenOCD | RTT Console`
 - `MCU | ST-LINK | Start GDB Server`
-
-## 5. Example Guides
-
-Per-example build and validation guides live in:
-
-- [`docs/examples/README.md`](../examples/README.md)

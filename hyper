@@ -19,7 +19,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 TOOLS_DIR = REPO_ROOT / "tools"
 STLIB_ROOT = REPO_ROOT / "deps" / "ST-LIB"
-BUILD_EXAMPLE_SCRIPT = TOOLS_DIR / "build-example.sh"
 PREFLASH_CHECK_SCRIPT = TOOLS_DIR / "preflash_check.py"
 INIT_SCRIPT = TOOLS_DIR / "init.sh"
 STLIB_BUILD_SCRIPT = STLIB_ROOT / "tools" / "build.py"
@@ -76,12 +75,11 @@ HELP_BANNER = "\n".join(
     + [f"║{row.center(HELP_BANNER_WIDTH)}║" for row in HELP_BANNER_ROWS]
     + ["╚" + "═" * HELP_BANNER_WIDTH + "╝"]
 )
-HELP_EXAMPLES = """Examples:
+HELP_EXAMPLES = """Usage:
   hyper doctor
-  hyper build adc --preset nucleo-debug --test 1
   hyper build main --preset nucleo-debug
   hyper hardfault-analysis
-  hyper run adc --preset nucleo-debug --test 1 --uart
+  hyper run main --preset nucleo-debug --uart
   hyper uart --list-ports
 """
 SERIAL_PATTERNS = (
@@ -811,36 +809,29 @@ def resolve_uart_tool(requested: str) -> str:
     )
 
 
-def run_build_example(
+def run_build_main(
     *,
-    example: str,
-    test: str | None,
-    no_test: bool,
+    target: str,
     preset: str,
     board_name: str | None,
     extra_cxx_flags: str | None,
     jobs: int | None,
 ) -> None:
-    ensure_file(BUILD_EXAMPLE_SCRIPT, "build-example helper")
-    is_main_target = example.strip().lower() in {"main", "default"}
-    selected_test = "none" if no_test or is_main_target else (test or "default")
+    if target.strip().lower() not in {"main", "default"}:
+        raise HyperError("This repository only builds the VCU firmware target: main.")
+
     print_action(
         "Build",
-        example=example,
+        target="main",
         preset=preset,
-        test=selected_test,
         board_name=board_name or "default",
     )
 
-    cmd: list[object] = [BUILD_EXAMPLE_SCRIPT, "--example", example, "--preset", preset]
-    if no_test:
-        cmd.append("--no-test")
-    elif test is not None:
-        cmd.extend(["--test", test])
+    configure_cmd: list[object] = ["cmake", "--preset", preset]
     if board_name:
-        cmd.extend(["--board-name", board_name])
+        configure_cmd.append(f"-DBOARD_NAME={board_name}")
     if extra_cxx_flags:
-        cmd.extend(["--extra-cxx-flags", extra_cxx_flags])
+        configure_cmd.append(f"-DCMAKE_CXX_FLAGS={extra_cxx_flags}")
 
     env = os.environ.copy()
     if jobs:
@@ -849,7 +840,8 @@ def run_build_example(
     if extra_cxx_flags:
         print_detail("extra cxx flags", extra_cxx_flags)
 
-    run_command(cmd, env=env)
+    run_command(configure_cmd, env=env)
+    run_command(["cmake", "--build", "--preset", preset], env=env)
     print_note("build completed", status="ok")
 
 
@@ -951,25 +943,9 @@ def handle_init(_: argparse.Namespace) -> int:
     return 0
 
 
-def handle_examples_list(_: argparse.Namespace) -> int:
-    ensure_file(BUILD_EXAMPLE_SCRIPT, "build-example helper")
-    print_action("Examples", mode="list")
-    run_command([BUILD_EXAMPLE_SCRIPT, "--list"])
-    return 0
-
-
-def handle_examples_tests(args: argparse.Namespace) -> int:
-    ensure_file(BUILD_EXAMPLE_SCRIPT, "build-example helper")
-    print_action("Examples", mode="tests", example=args.example)
-    run_command([BUILD_EXAMPLE_SCRIPT, "--list-tests", args.example])
-    return 0
-
-
 def handle_build(args: argparse.Namespace) -> int:
-    run_build_example(
-        example=args.example,
-        test=args.test,
-        no_test=args.no_test,
+    run_build_main(
+        target=args.target,
         preset=args.preset,
         board_name=args.board_name,
         extra_cxx_flags=args.extra_cxx_flags,
@@ -986,10 +962,8 @@ def handle_flash(args: argparse.Namespace) -> int:
 def handle_run(args: argparse.Namespace) -> int:
     print(style("Hyper Run", "1"))
     print(style("=" * 16, "2"))
-    run_build_example(
-        example=args.example,
-        test=args.test,
-        no_test=args.no_test,
+    run_build_main(
+        target=args.target,
         preset=args.preset,
         board_name=args.board_name,
         extra_cxx_flags=args.extra_cxx_flags,
@@ -1152,13 +1126,8 @@ def handle_hardfault_analysis(_: argparse.Namespace) -> int:
     return 0
 
 
-def add_example_build_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("example", help="Target name, e.g. adc or main")
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("--test", help="Test selector, e.g. 0, 1 or TEST_1")
-    group.add_argument(
-        "--no-test", action="store_true", help="Do not inject any TEST_* macro"
-    )
+def add_build_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("target", nargs="?", default="main", help="Firmware target: main")
     parser.add_argument(
         "--preset", default=DEFAULT_PRESET, help="CMake preset to build"
     )
@@ -1181,26 +1150,8 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser("init", help="Run tools/init.sh")
     init_parser.set_defaults(func=handle_init)
 
-    examples_parser = subparsers.add_parser(
-        "examples", help="Inspect available examples"
-    )
-    examples_subparsers = examples_parser.add_subparsers(
-        dest="examples_command", required=True
-    )
-
-    examples_list_parser = examples_subparsers.add_parser(
-        "list", help="List EXAMPLE_* selectors"
-    )
-    examples_list_parser.set_defaults(func=handle_examples_list)
-
-    examples_tests_parser = examples_subparsers.add_parser(
-        "tests", help="List TEST_* selectors for one example"
-    )
-    examples_tests_parser.add_argument("example", help="Example name, e.g. adc")
-    examples_tests_parser.set_defaults(func=handle_examples_tests)
-
-    build_parser_cmd = subparsers.add_parser("build", help="Build one firmware target")
-    add_example_build_arguments(build_parser_cmd)
+    build_parser_cmd = subparsers.add_parser("build", help="Build the VCU firmware")
+    add_build_arguments(build_parser_cmd)
     build_parser_cmd.set_defaults(func=handle_build)
 
     flash_parser = subparsers.add_parser(
@@ -1228,9 +1179,9 @@ def build_parser() -> argparse.ArgumentParser:
     flash_parser.set_defaults(func=handle_flash)
 
     run_parser = subparsers.add_parser(
-        "run", help="Build then flash one firmware target"
+        "run", help="Build then flash the VCU firmware"
     )
-    add_example_build_arguments(run_parser)
+    add_build_arguments(run_parser)
     run_parser.add_argument(
         "--elf", type=Path, default=LATEST_ELF, help="ELF image to flash after build"
     )

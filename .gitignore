@@ -12,6 +12,7 @@ build/
 out/
 
 # IDE
+.DS_Store
 *.launch
 .metadata
 .settings/

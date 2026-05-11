@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(template-project LANGUAGES ASM C CXX)
+project(VCU-H11 LANGUAGES ASM C CXX)
 include(CTest)
 enable_testing()
 
 set(EXECUTABLE ${PROJECT_NAME}.elf)
-set(BOARD_NAME "TEST" CACHE STRING "Board key from Core/Inc/Code_generation/JSON_ADE/boards.json")
+set(BOARD_NAME "VCU" CACHE STRING "Board key from Core/Inc/Code_generation/JSON_ADE/boards.json")
 if(BOARD_NAME STREQUAL "")
   message(FATAL_ERROR "BOARD_NAME cannot be empty")
 endif()
@@ -29,7 +29,6 @@ endif()
 
 option(USE_ETHERNET "Enable ethernet peripheral" OFF)
 option(TARGET_NUCLEO "Targets the STM32H723 Nucleo development board" OFF)
-option(BUILD_EXAMPLES "Build Core/Src/Examples sources" OFF)
 option(USE_CCACHE "Use ccache if available" ON)
 if(NOT DEFINED ENABLE_LTO)
   if(CMAKE_CROSSCOMPILING)
@@ -49,10 +48,10 @@ if(USE_CCACHE)
   endif()
 endif()
 
-message(STATUS "Template project: CMAKE_CROSSCOMPILING = ${CMAKE_CROSSCOMPILING}")
-message(STATUS "Template project: USE_ETHERNET         = ${USE_ETHERNET}")
-message(STATUS "Template project: TARGET_NUCLEO        = ${TARGET_NUCLEO}")
-message(STATUS "Template project: BOARD_NAME           = ${BOARD_NAME}")
+message(STATUS "VCU-H11: CMAKE_CROSSCOMPILING = ${CMAKE_CROSSCOMPILING}")
+message(STATUS "VCU-H11: USE_ETHERNET         = ${USE_ETHERNET}")
+message(STATUS "VCU-H11: TARGET_NUCLEO        = ${TARGET_NUCLEO}")
+message(STATUS "VCU-H11: BOARD_NAME           = ${BOARD_NAME}")
 
 add_subdirectory(${STLIB_DIR})
 message(STATUS "Using ST-LIB target: ${STLIB_LIBRARY}")
@@ -121,21 +120,6 @@ if(CMAKE_CROSSCOMPILING)
   file(GLOB_RECURSE SOURCE_H CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/Core/*.h)
   file(GLOB_RECURSE SOURCE_HPP CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/Core/*.hpp)
 
-  if(NOT BUILD_EXAMPLES)
-    file(GLOB_RECURSE EXAMPLE_CPP CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/Core/Src/Examples/*.cpp)
-    list(REMOVE_ITEM SOURCE_CPP ${EXAMPLE_CPP})
-  endif()
-
-  set(EXAMPLE_SELECTED OFF)
-  # If an EXAMPLE_* macro is injected through CXX flags, mark the build as
-  # example-selected so main.cpp can disable only the default main().
-  if(BUILD_EXAMPLES)
-    if(CMAKE_CXX_FLAGS MATCHES "(^|[ \t])-DEXAMPLE_[A-Za-z0-9_]+")
-      set(EXAMPLE_SELECTED ON)
-      message(STATUS "Template project: EXAMPLE_* detected, disabling default main()")
-    endif()
-  endif()
-
   add_executable(${EXECUTABLE}
     ${SOURCE_C}
     ${SOURCE_CPP}
@@ -157,7 +141,6 @@ if(CMAKE_CROSSCOMPILING)
   )
 
   target_compile_definitions(${EXECUTABLE} PRIVATE
-    $<$<BOOL:${EXAMPLE_SELECTED}>:EXAMPLE_SELECTED>
     $<$<BOOL:${USE_ETHERNET}>:STLIB_ETH>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,NUCLEO,BOARD>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,HSE_VALUE=8000000,HSE_VALUE=25000000>

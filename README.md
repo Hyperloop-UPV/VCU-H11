@@ -1,36 +1,59 @@
-# Template Project
+# VCU-H11
 
-HyperloopUPV STM32 firmware template based on CMake + VSCode, using `deps/ST-LIB`.
+Vehicle Control Unit firmware for Hyperloop UPV.
 
-## Quickstart
+The VCU is the pod-level controller for the H11 custom board based on the STM32H723ZGT6. It coordinates the vehicle-facing control and telemetry functions around cooling, pressure regulation, braking support signals, SDC state, flow and temperature sensing, CAN, Ethernet, SD storage, and board status indication.
+
+## Responsibilities
+
+The firmware is responsible for:
+
+- Initializing the VCU hardware through ST-LIB.
+- Managing VCU operational modes.
+- Reading pressure, temperature, flow, SDC, brake, and SD-card related inputs.
+- Driving status LEDs and VCU actuators such as the cooling pump, electrovalve, pressure regulator command path, brake reset, and CAN silent control.
+- Publishing VCU telemetry and receiving commands through the generated packet interface.
+- Evaluating protections and reporting diagnostics through ST-LIB infrastructure.
+
+## Architecture
+
+VCU-H11 is a C++23 STM32 firmware project built around ST-LIB.
+
+Application code is organized around these entry points:
+
+- `Core/Src/main.cpp`: firmware entry point.
+- `Core/Inc/VCU.hpp`: VCU facade and `ST_LIB::Board<...>` definition.
+- `Core/Inc/VCU_TYPES.hpp`: Board device declarations, runtime instances, sensors, and VCU state.
+- `Core/Inc/Pinout/Pinout.hpp`: board pin aliases with firmware-facing names.
+- `Core/Inc/StateMachine/VCU_StateMachine.hpp`: operational state machine.
+- `Core/Inc/Code_generation/JSON_ADE/boards/VCU/`: packet schema inputs for generated communication code.
+
+All hardware access should go through ST-LIB. Application code should use the highest-level ST-LIB abstraction that fits the hardware role, for example `LinearSensor` for linear analog sensors, `NTC` for NTC channels, `SensorInterrupt`/`EXTIDomain` for edge-triggered sensors, and Board-managed domain instances for lower-level peripherals.
+
+Fault state ownership belongs to ST-LIB infrastructure. The VCU application state machine should describe operational modes, while protections and diagnostics handle fault behavior.
+
+## Hardware References
+
+Hardware design references are stored under `docs/`:
+
+- `VCU.ioc`: STM32CubeMX pin and peripheral role reference.
+- `VCU_H11.zip`: Altium project archive.
+- `Schematic PDF_[No Variations].pdf`: schematic PDF export.
+- `Gerber for PCB.PcbDoc.zip`: PCB fabrication output.
+- `STEP_[No Variations] for PCB.PcbDoc.step`: mechanical model.
+
+## Build And Flash
+
+Use the local `hyper` helper CLI for common workflows:
 
 ```sh
-./hyper init
 ./hyper doctor
-./hyper build main --preset simulator
-./hyper stlib build --preset simulator --run-tests
+./hyper build main --preset board-debug --board-name VCU
+./hyper build main --preset board-debug-eth-lan8700 --board-name VCU
+./hyper run main --preset board-debug --board-name VCU --uart
 ```
 
-## Hyper CLI
-
-The repo includes a local helper CLI at `./hyper` for the common hardware flow:
-
-```sh
-./hyper examples list
-./hyper build adc --test 1
-./hyper run adc --test 1 --uart
-./hyper uart
-./hyper doctor
-```
-
-It wraps the existing repo scripts instead of replacing them, and also exposes a small ST-LIB namespace:
-
-```sh
-./hyper stlib build --preset simulator --run-tests
-./hyper stlib sim-tests
-```
-
-Useful defaults can be pinned with environment variables:
+Useful environment variables:
 
 - `HYPER_DEFAULT_PRESET`
 - `HYPER_FLASH_METHOD`
@@ -38,49 +61,30 @@ Useful defaults can be pinned with environment variables:
 - `HYPER_UART_BAUD`
 - `HYPER_UART_TOOL`
 
-> [!NOTE]
-To connect through UART (`./hyper uart`), it's recommended to install `tio` with your package manager.
+For UART sessions, `tio` is the recommended terminal tool.
+
+## Packet Generation
+
+The packet interface is generated from the ADJ schema for `BOARD_NAME=VCU`:
+
+```text
+Core/Inc/Code_generation/JSON_ADE/boards/VCU/
+```
+
+CMake regenerates packet headers during configure. Manual regeneration is also available:
+
+```sh
+python3 Core/Inc/Code_generation/Generator.py VCU
+```
+
+Generated packet headers are build outputs and should not be edited by hand:
+
+- `Core/Inc/Communications/Packets/DataPackets.hpp`
+- `Core/Inc/Communications/Packets/OrderPackets.hpp`
 
 ## Documentation
 
-- Template setup: [`docs/template-project/setup.md`](docs/template-project/setup.md)
-- Build and debug: [`docs/template-project/build-debug.md`](docs/template-project/build-debug.md)
-- Testing and quality: [`docs/template-project/testing.md`](docs/template-project/testing.md)
-- Per-example guides: [`docs/examples/README.md`](docs/examples/README.md)
-- TCP/IP hardware stress example: [`docs/template-project/example-tcpip.md`](docs/template-project/example-tcpip.md)
-- ST-LIB docs (inside this repository): [`deps/ST-LIB/docs/setup.md`](deps/ST-LIB/docs/setup.md)
+Project-specific AI and maintenance context:
 
-## Main Working Modes
-
-- `simulator`: fast local development and tests.
-- `nucleo-*` / `board-*`: hardware builds.
-
-```sh
-./hyper build main --preset simulator
-./hyper build main --preset nucleo-debug
-./hyper build main --preset board-debug
-```
-
-## VSCode Debug
-
-`launch.json` and `tasks.json` include debug flows for:
-
-- OpenOCD
-- ST-LINK
-- simulator tests
-
-Detailed guide:
-
-- [`docs/template-project/build-debug.md`](docs/template-project/build-debug.md)
-
-## `BOARD_NAME` (code generation)
-
-Packet code generation uses `BOARD_NAME` (a key from JSON_ADE).
-
-Example:
-
-```sh
-./hyper build main --preset board-debug --board-name TEST
-```
-
-Generated packet headers such as `Core/Inc/Communications/Packets/DataPackets.hpp` and `Core/Inc/Communications/Packets/OrderPackets.hpp` are build outputs derived from the active `JSON_ADE` schema. They are intentionally gitignored and should not be edited or committed.
+- `AGENTS.md`
+- `docs/ai/vcu-context.md`

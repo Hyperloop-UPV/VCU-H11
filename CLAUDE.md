@@ -1,13 +1,12 @@
-# template-project
+# VCU-H11
 
-Firmware template for HyperloopUPV pod control boards. Target: STM32H723ZGT6 (ARM Cortex-M7 @ 550 MHz).
+Vehicle Control Unit firmware for Hyperloop UPV. Target: STM32H723ZGT6 (ARM Cortex-M7 @ 550 MHz).
 
 ## Architecture
 
 - **ST-LIB** (`deps/ST-LIB`): hardware abstraction library (submodule). All peripheral access goes through it. Never use STM32 HAL directly.
 - **`Board<>`** template: compile-time peripheral registration. All peripherals declared as `constexpr` globals and passed as template parameters.
 - **Packet system**: inter-board communication via UDP/TCP. Headers generated from JSON schemas in `Core/Inc/Code_generation/JSON_ADE/`.
-- **Examples** (`Core/Src/Examples/`): self-contained programs enabled via `-DEXAMPLE_[NAME]=ON`. Each has `TEST_0`, `TEST_1`... variants with separate `main()`.
 
 ## Build system
 
@@ -16,8 +15,7 @@ CMake + Ninja. Python venv at `virtual/`. Use `./hyper` CLI for all common tasks
 ```bash
 ./hyper build main --preset simulator              # build simulator
 ./hyper build main --preset nucleo-debug           # build for Nucleo board
-./hyper build adc --test 0 --preset nucleo-debug   # build ExampleADC TEST_0
-./hyper run adc --test 0                           # flash + open UART
+./hyper run main --preset board-debug --uart       # build, flash, and open UART
 ./hyper stlib build --preset simulator --run-tests # run CTest suite
 ./hyper doctor                                     # check tool dependencies
 ```
@@ -68,26 +66,10 @@ Generated output (gitignored, rebuilt on configure):
 
 Manual regeneration:
 ```bash
-python3 Core/Inc/Code_generation/Generator.py TEST
+python3 Core/Inc/Code_generation/Generator.py VCU
 ```
 
-CMake runs this automatically at configure time using the `BOARD_NAME` variable (default: `TEST`). Available boards: `Core/Inc/Code_generation/JSON_ADE/boards.json`.
-
-## Examples pattern
-
-Each example in `Core/Src/Examples/Example[Name].cpp`:
-- Entire file wrapped in `#ifdef EXAMPLE_[NAME]` / `#endif`
-- Multiple test variants: `#ifdef TEST_0` ... `#ifdef TEST_1` etc., each with its own `int main()`
-- All configs declared as `constexpr` in anonymous namespace
-- Board type: `using ExampleXBoard = ST_LIB::Board<cfg1, cfg2, ...>`
-- Init sequence: `ExampleXBoard::init()` → `ExampleXBoard::instance_of<cfg>()`
-
-Build and run an example:
-```bash
-./hyper build adc --test 0 --preset simulator       # compile only
-./hyper build adc --test 1 --preset nucleo-debug    # for hardware
-./hyper run adc --test 1 --uart                     # flash + UART monitor
-```
+CMake runs this automatically at configure time using the `BOARD_NAME` variable (default: `VCU`). Available boards: `Core/Inc/Code_generation/JSON_ADE/boards.json`.
 
 ## Testing
 
