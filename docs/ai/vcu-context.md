@@ -66,7 +66,7 @@ Firmware concepts must be in English. Prefer domain names that describe intent, 
 
 Current pinout naming examples:
 
-- `cooling_pump`, not `bomba_mcu`
+- `cooling_pump_1` and `cooling_pump_2`, not `bomba_*`
 - `electrovalve`, not `electrovalv`
 - `pressure_regulator_in` and `pressure_regulator_out`, not `regulador_*`
 - `brake_reset` and `brake_fault`
@@ -77,30 +77,32 @@ The Altium schematic may use Spanish names or shortened net names. Convert those
 
 ## Pinout Facts
 
-The initial pinout was extracted from `docs/VCU_H11.zip`, specifically `MCU.SchDoc`, cross-checked with `docs/Schematic PDF_[No Variations].pdf`.
+The current pinout was extracted from `docs/VCU_H11G.zip`, specifically `MCU.SchDoc`, cross-checked with `docs/Schematic PDF_[No Variations].pdf`.
 
 `docs/VCU.ioc` is the current source for each MCU pin role. Confirmed roles:
 
 - `PF0` and `PF1`: TIM23 input capture channels for flow sensors.
 - `PF3` and `PF4`: ADC3 inputs for NTC temperature sensors.
 - `PF11` and `PF12`: ADC1 inputs for high/low pressure sensors.
-- `PA5`: ADC2 input for pressure regulator output sensing.
+- `PA5`: ADC2 input for pressure regulator feedback sensing.
+- `PA6`: TIM13 channel 1 PWM output for pressure regulator command.
 - `PF6`: EXTI6 input for `sdc_closed`.
 - `PD14`: digital input for `brake_fault`.
 - `PD15`: digital output for `brake_reset`.
-- `PE13`: digital output for `cooling_pump`.
+- `PE13`: digital output for `cooling_pump_1`.
+- `PE14`: digital output for `cooling_pump_2`.
 - `PE15`: digital output for `electrovalve`.
 - `PA8`: digital output for CAN silent mode.
 - `PG3` and `PG4`: digital inputs for SDMMC write-protect and card-detect.
-- `PG9` through `PG13`: digital outputs for info LEDs.
+- `PG9` through `PG13`: digital outputs for info LEDs. The corrected Altium net on `PG11` is `LED_CONNECTING`, not `LED_FLASH`.
 
 Current firmware-facing pin aliases:
 
 | Concept | STM32 pin |
 | --- | --- |
 | `led_sleep` | `PG9` |
-| `led_flash` | `PG10` |
-| `led_can` | `PG11` |
+| `led_can` | `PG10` |
+| `led_connecting` | `PG11` |
 | `led_fault` | `PG12` |
 | `led_operational` / `led_status` | `PG13` |
 | `can_txd` | `PA12` |
@@ -121,12 +123,15 @@ Current firmware-facing pin aliases:
 | `high_pressure` | `PF11` |
 | `low_pressure` | `PF12` |
 | `sdc_closed` | `PF6` |
-| `cooling_pump` | `PE13` |
+| `cooling_pump_1` | `PE13` |
+| `cooling_pump_2` | `PE14` |
 | `electrovalve` | `PE15` |
-| `pressure_regulator_in` | `PA4` |
+| `pressure_regulator_in` | `PA6` |
 | `pressure_regulator_out` | `PA5` |
 | `brake_reset` | `PD15` |
 | `brake_fault` | `PD14` |
+
+Pressure regulator control is PWM-based: `pressure_regulator_in` is `PA6` / `TIM13_CH1`, conditioned by the regulator input op-amp circuit. Feedback is separate: `pressure_regulator_out` is `PA5` / `ADC2_INP19`, scaled from the regulator monitor output.
 
 Ethernet RMII is intentionally not listed in `Pinout.hpp`. Use ST-LIB pinset selection instead.
 
@@ -160,9 +165,11 @@ Do not restore `Core/Src/Runes/generated_metadata.cpp` after builds. The user ex
 Current hardware inputs in `docs/`:
 
 - `Schematic PDF_[No Variations].pdf`
-- `VCU_H11.zip`
+- `VCU_H11G.zip`
 - `Gerber for PCB.PcbDoc.zip`
 - `STEP_[No Variations] for PCB.PcbDoc.step`
+- `Assembly Drawings_[No Variations].pdf`
+- `BOM_[No Variations].csv`
 
 The Altium source archive is more authoritative than PDF OCR/text extraction. Use the `.SchDoc` records for pin/net extraction when possible.
 
@@ -176,7 +183,7 @@ These need confirmation before implementing more runtime behavior:
 - Protection thresholds and diagnostic IDs.
 - Whether brake fault should be EXTI-triggered, a polled protection, or both.
 - Exact flow-sensor abstraction. ST-LIB currently provides TIM23 input-capture support, but no dedicated flow/pulse sensor wrapper has been selected.
-- Packet contract cleanup and whether generated ADE names should also be normalized to English.
+- Final pressure, flow, and temperature packet units once calibration is defined.
 
 ## Maintenance Protocol
 

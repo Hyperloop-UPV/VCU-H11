@@ -30,8 +30,8 @@ FMAC_HandleTypeDef hfmac;
 extern FDCAN_HandleTypeDef hfdcan1;
 
 FDCAN::Instance FDCAN::instance1 = {
-    .TX = PD1,
-    .RX = PD0,
+    .TX = PA12,
+    .RX = PA11,
     .hfdcan = &hfdcan1,
     .instance = FDCAN1,
     .dlc = DLC::BYTES_64,

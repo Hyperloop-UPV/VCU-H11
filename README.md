@@ -11,7 +11,7 @@ The firmware is responsible for:
 - Initializing the VCU hardware through ST-LIB.
 - Managing VCU operational modes.
 - Reading pressure, temperature, flow, SDC, brake, and SD-card related inputs.
-- Driving status LEDs and VCU actuators such as the cooling pump, electrovalve, pressure regulator command path, brake reset, and CAN silent control.
+- Driving status LEDs and VCU actuators such as the two cooling pump outputs, electrovalve, PWM pressure regulator command path, brake reset, and CAN silent control.
 - Publishing VCU telemetry and receiving commands through the generated packet interface.
 - Evaluating protections and reporting diagnostics through ST-LIB infrastructure.
 
@@ -37,10 +37,12 @@ Fault state ownership belongs to ST-LIB infrastructure. The VCU application stat
 Hardware design references are stored under `docs/`:
 
 - `VCU.ioc`: STM32CubeMX pin and peripheral role reference.
-- `VCU_H11.zip`: Altium project archive.
+- `VCU_H11G.zip`: Altium project archive.
 - `Schematic PDF_[No Variations].pdf`: schematic PDF export.
 - `Gerber for PCB.PcbDoc.zip`: PCB fabrication output.
 - `STEP_[No Variations] for PCB.PcbDoc.step`: mechanical model.
+- `Assembly Drawings_[No Variations].pdf`: assembly drawing export.
+- `BOM_[No Variations].csv`: bill of materials export.
 
 ## Build And Flash
 

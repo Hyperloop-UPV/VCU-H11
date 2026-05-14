@@ -11,8 +11,8 @@ namespace Pinout {
 // ============================================
 
 inline auto& led_sleep = ST_LIB::PG9;
-inline auto& led_flash = ST_LIB::PG10;
-inline auto& led_can = ST_LIB::PG11;
+inline auto& led_can = ST_LIB::PG10;
+inline auto& led_connecting = ST_LIB::PG11;
 inline auto& led_fault = ST_LIB::PG12;
 inline auto& led_operational = ST_LIB::PG13;
 inline auto& led_status = led_operational;
@@ -54,9 +54,10 @@ inline auto& sdc_closed = ST_LIB::PF6;
 // Actuators
 // ============================================
 
-inline auto& cooling_pump = ST_LIB::PE13;
+inline auto& cooling_pump_1 = ST_LIB::PE13;
+inline auto& cooling_pump_2 = ST_LIB::PE14;
 inline auto& electrovalve = ST_LIB::PE15;
-inline auto& pressure_regulator_in = ST_LIB::PA4;
+inline auto& pressure_regulator_in = ST_LIB::PA6;
 inline auto& pressure_regulator_out = ST_LIB::PA5;
 inline auto& brake_reset = ST_LIB::PD15;
 inline auto& brake_fault = ST_LIB::PD14;

@@ -14,11 +14,12 @@ using Board = ST_LIB::Board<
 #endif
     led_status_req,
     led_sleep_req,
-    led_flash_req,
     led_can_req,
+    led_connecting_req,
     led_fault_req,
     can_silent_req,
-    cooling_pump_req,
+    cooling_pump_1_req,
+    cooling_pump_2_req,
     electrovalve_req,
     brake_reset_req,
     brake_fault_req,
@@ -28,6 +29,7 @@ using Board = ST_LIB::Board<
     high_pressure_adc_req,
     low_pressure_adc_req,
     pressure_regulator_out_adc_req,
+    pressure_regulator_timer_req,
     ntc_temperature_1_adc_req,
     ntc_temperature_2_adc_req,
     flow_timer_req>;
@@ -37,11 +39,12 @@ inline void init() {
 
     led_status = &Board::instance_of<led_status_req>();
     led_sleep = &Board::instance_of<led_sleep_req>();
-    led_flash = &Board::instance_of<led_flash_req>();
     led_can = &Board::instance_of<led_can_req>();
+    led_connecting = &Board::instance_of<led_connecting_req>();
     led_fault = &Board::instance_of<led_fault_req>();
     can_silent = &Board::instance_of<can_silent_req>();
-    cooling_pump = &Board::instance_of<cooling_pump_req>();
+    cooling_pump_1 = &Board::instance_of<cooling_pump_1_req>();
+    cooling_pump_2 = &Board::instance_of<cooling_pump_2_req>();
     electrovalve = &Board::instance_of<electrovalve_req>();
     brake_reset = &Board::instance_of<brake_reset_req>();
     brake_fault = &Board::instance_of<brake_fault_req>();
@@ -73,6 +76,11 @@ inline void init() {
         NTC(Board::instance_of<ntc_temperature_2_adc_req>(), ntc_temperature_2);
     sdc_closed_sensor = SensorInterrupt(*sdc_closed_interrupt, sdc_closed_state);
     flow_timer = ST_LIB::TimerWrapper<flow_timer_req>(&Board::instance_of<flow_timer_req>());
+    pressure_regulator_timer =
+        ST_LIB::TimerWrapper<pressure_regulator_timer_req>(&Board::instance_of<pressure_regulator_timer_req>());
+    pressure_regulator_pwm.emplace(
+        pressure_regulator_timer.template get_pwm<pressure_regulator_in_pwm_pin>()
+    );
 
     sdc_closed_interrupt->turn_on();
     led_status->turn_on();

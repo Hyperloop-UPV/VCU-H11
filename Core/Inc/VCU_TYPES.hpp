@@ -4,6 +4,8 @@
 #include "Pinout/Pinout.hpp"
 #include "ST-LIB.hpp"
 
+#include <optional>
+
 namespace VCU {
 
 #ifdef STLIB_ETH
@@ -37,15 +39,18 @@ inline constexpr auto led_status_req =
     ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::led_status);
 
 inline constexpr auto led_sleep_req = ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::led_sleep);
-inline constexpr auto led_flash_req = ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::led_flash);
 inline constexpr auto led_can_req = ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::led_can);
+inline constexpr auto led_connecting_req =
+    ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::led_connecting);
 inline constexpr auto led_fault_req = ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::led_fault);
 
 inline constexpr auto can_silent_req =
     ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::can_silent);
 
-inline constexpr auto cooling_pump_req =
-    ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::cooling_pump);
+inline constexpr auto cooling_pump_1_req =
+    ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::cooling_pump_1);
+inline constexpr auto cooling_pump_2_req =
+    ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::cooling_pump_2);
 inline constexpr auto electrovalve_req =
     ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::electrovalve);
 inline constexpr auto brake_reset_req =
@@ -95,6 +100,17 @@ inline constexpr auto pressure_regulator_out_adc_req = ST_LIB::ADCDomain::ADC(
     pressure_adc_prescaler
 );
 
+inline constexpr ST_LIB::TimerPin pressure_regulator_in_pwm_pin{
+    .af = ST_LIB::TimerAF::PWM,
+    .pin = Pinout::pressure_regulator_in,
+    .channel = ST_LIB::TimerChannel::CHANNEL_1,
+};
+inline constexpr auto pressure_regulator_timer_req = ST_LIB::TimerDomain::Timer{
+    ST_LIB::TimerRequest::SlaveTimer_13,
+    ST_LIB::TimerDomain::EMPTY_TIMER_NAME,
+    pressure_regulator_in_pwm_pin,
+};
+
 inline constexpr auto ntc_adc_resolution = ST_LIB::ADCDomain::Resolution::BITS_12;
 inline constexpr auto ntc_adc_sample_time = ST_LIB::ADCDomain::SampleTime::CYCLES_2_5;
 inline constexpr auto ntc_adc_prescaler = ST_LIB::ADCDomain::ClockPrescaler::DIV4;
@@ -135,11 +151,12 @@ inline constexpr auto flow_timer_req = ST_LIB::TimerDomain::Timer{
 
 inline ST_LIB::DigitalOutputDomain::Instance* led_status = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* led_sleep = nullptr;
-inline ST_LIB::DigitalOutputDomain::Instance* led_flash = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* led_can = nullptr;
+inline ST_LIB::DigitalOutputDomain::Instance* led_connecting = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* led_fault = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* can_silent = nullptr;
-inline ST_LIB::DigitalOutputDomain::Instance* cooling_pump = nullptr;
+inline ST_LIB::DigitalOutputDomain::Instance* cooling_pump_1 = nullptr;
+inline ST_LIB::DigitalOutputDomain::Instance* cooling_pump_2 = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* electrovalve = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* brake_reset = nullptr;
 
@@ -149,6 +166,9 @@ inline ST_LIB::DigitalInputDomain::Instance* sdmmc_write_protect = nullptr;
 inline ST_LIB::EXTIDomain::Instance* sdc_closed_interrupt = nullptr;
 
 inline ST_LIB::TimerWrapper<flow_timer_req> flow_timer;
+inline ST_LIB::TimerWrapper<pressure_regulator_timer_req> pressure_regulator_timer;
+using PressureRegulatorPwm = ST_LIB::PWM<pressure_regulator_timer_req, pressure_regulator_in_pwm_pin>;
+inline std::optional<PressureRegulatorPwm> pressure_regulator_pwm;
 
 inline constexpr float uncalibrated_linear_gain = 1.0f;
 inline constexpr float uncalibrated_linear_offset = 0.0f;
