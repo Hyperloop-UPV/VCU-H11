@@ -15,7 +15,6 @@ inline auto& led_can = ST_LIB::PG10;
 inline auto& led_connecting = ST_LIB::PG11;
 inline auto& led_fault = ST_LIB::PG12;
 inline auto& led_operational = ST_LIB::PG13;
-inline auto& led_status = led_operational;
 
 // ============================================
 // CAN
@@ -48,6 +47,7 @@ inline auto& ntc_temperature_1 = ST_LIB::PF3;
 inline auto& ntc_temperature_2 = ST_LIB::PF4;
 inline auto& high_pressure = ST_LIB::PF11;
 inline auto& low_pressure = ST_LIB::PF12;
+inline auto& pressure_regulator_out = ST_LIB::PA5;
 inline auto& sdc_closed = ST_LIB::PF6;
 
 // ============================================
@@ -57,8 +57,6 @@ inline auto& sdc_closed = ST_LIB::PF6;
 inline auto& cooling_pump_1 = ST_LIB::PE13;
 inline auto& cooling_pump_2 = ST_LIB::PE14;
 inline auto& electrovalve = ST_LIB::PE15;
-inline auto& pressure_regulator_in = ST_LIB::PA6;
-inline auto& pressure_regulator_out = ST_LIB::PA5;
 inline auto& brake_reset = ST_LIB::PD15;
 inline auto& brake_fault = ST_LIB::PD14;
 
