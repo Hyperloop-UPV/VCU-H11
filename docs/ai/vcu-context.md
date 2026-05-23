@@ -8,6 +8,19 @@ VCU-H11 is the Vehicle Control Unit firmware for Hyperloop UPV. In conversations
 
 The repository was created from `Hyperloop-UPV/template-project`, but template example code and example docs are not part of the VCU product surface.
 
+## Legacy VCU Logic Reference
+
+The previous VCU board codebase at `/Users/jsaegar/hyper-src/VCU-H10-V2` is a behavior reference only. It used an old ST-LIB API and should not be copied for H11 hardware access patterns.
+
+Extracted H10-V2 business-logic docs live in `docs/vcu-logic/`. They describe the VCU as the vehicle master responsible for state-gated command arbitration, local brake/pump/sensor handling, telemetry, remote-board order forwarding, acknowledgement tracking, and faulting on unsafe conditions, lost required peers, emergency stop, or remote acknowledgement timeout.
+
+Stable H10 behavior to preserve in H11 intent:
+
+- Required peer connectivity gates normal operation. In the inspected H10 code, control station, HVSCU, and PCU were required for the transition from connecting to operational.
+- Normal operational modes are `Idle`, `EndOfRun`, `Energized`, `Ready`, `Demonstration`, and `Recovery`; `EndOfRun` was declared in H10 but had no implemented transitions in the inspected snapshot.
+- Orders should be validated against operational state before acting. Remote orders should wait for remote-board state acknowledgement and fault on timeout.
+- Local fault/safety behavior includes SDC-open faulting, emergency-stop propagation, brake-on-fault intent, and tape/brake reed checks that need active-level and safety review before H11 implementation.
+
 ## Current Firmware Shape
 
 - Main application entry: `Core/Src/main.cpp`.
@@ -16,6 +29,8 @@ The repository was created from `Hyperloop-UPV/template-project`, but template e
 - State machine skeleton: `Core/Inc/StateMachine/VCU_StateMachine.hpp`.
 - Hardware pin aliases: `Core/Inc/Pinout/Pinout.hpp`.
 - Packet schemas: `Core/Inc/Code_generation/JSON_ADE/boards/VCU/`.
+
+Generated Ethernet comms bind the control-station UDP telemetry socket plus PCU, HVSCU, and LCU UDP sockets. The remote UDP sockets are needed because incoming state packets update the global `HeapPacket` values that the VCU uses for acknowledgement tracking.
 
 `VCU::update()` should keep servicing infrastructure each loop:
 
@@ -68,7 +83,7 @@ Current pinout naming examples:
 
 - `cooling_pump_1` and `cooling_pump_2`, not `bomba_*`
 - `electrovalve`, not `electrovalv`
-- `pressure_regulator_in` and `pressure_regulator_out`, not `regulador_*`
+- `pressure_regulator_out`, not `regulador_*`
 - `brake_reset` and `brake_fault`
 - `ntc_temperature_1` and `ntc_temperature_2`
 - `sdc_closed`
@@ -83,9 +98,10 @@ The current pinout was extracted from `docs/VCU_H11G.zip`, specifically `MCU.Sch
 
 - `PF0` and `PF1`: TIM23 input capture channels for flow sensors.
 - `PF3` and `PF4`: ADC3 inputs for NTC temperature sensors.
-- `PF11` and `PF12`: ADC1 inputs for high/low pressure sensors.
-- `PA5`: ADC2 input for pressure regulator feedback sensing.
-- `PA6`: TIM13 channel 1 PWM output for pressure regulator command.
+- `PF11`: ADC1 input for `high_pressure`, the conditioned output of `Transductor_Alta_Presion` on connector `J13`. The schematic notes this as a ratiometric 0-5000 PSI transducer with a 0.5-4.5 V analog output scaled to about 0.367-3.3 V before the MCU.
+- `PF12`: ADC1 input for `low_pressure`, the conditioned output of `Transductor_Baja_Presion` on connector `J14`. The schematic notes this as a ratiometric 0-10 bar sealed-gauge transducer with a 0.5-4.5 V analog output scaled to about 0.367-3.3 V before the MCU; because it is sealed gauge, the note says the real pressure range starts around 1.013 bar.
+- `PA5`: ADC2 input for manual pressure regulator feedback sensing.
+- `PA6`: not used by H11 firmware for regulator control. H11 uses a manual pressure regulator that is not commanded by firmware.
 - `PF6`: EXTI6 input for `sdc_closed`.
 - `PD14`: digital input for `brake_fault`.
 - `PD15`: digital output for `brake_reset`.
@@ -104,7 +120,7 @@ Current firmware-facing pin aliases:
 | `led_can` | `PG10` |
 | `led_connecting` | `PG11` |
 | `led_fault` | `PG12` |
-| `led_operational` / `led_status` | `PG13` |
+| `led_operational` | `PG13` |
 | `can_txd` | `PA12` |
 | `can_rxd` | `PA11` |
 | `can_silent` | `PA8` |
@@ -126,12 +142,11 @@ Current firmware-facing pin aliases:
 | `cooling_pump_1` | `PE13` |
 | `cooling_pump_2` | `PE14` |
 | `electrovalve` | `PE15` |
-| `pressure_regulator_in` | `PA6` |
 | `pressure_regulator_out` | `PA5` |
 | `brake_reset` | `PD15` |
 | `brake_fault` | `PD14` |
 
-Pressure regulator control is PWM-based: `pressure_regulator_in` is `PA6` / `TIM13_CH1`, conditioned by the regulator input op-amp circuit. Feedback is separate: `pressure_regulator_out` is `PA5` / `ADC2_INP19`, scaled from the regulator monitor output.
+H11 does not use firmware-controlled pressure regulation. Do not request `PA6` / `TIM13_CH1` as a regulator PWM device, do not expose a set-regulator order, and do not publish commanded regulator duty. The pressure regulator is manual; firmware may only observe its feedback through `pressure_regulator_out` on `PA5` / `ADC2_INP19`.
 
 Ethernet RMII is intentionally not listed in `Pinout.hpp`. Use ST-LIB pinset selection instead.
 
@@ -181,7 +196,7 @@ These need confirmation before implementing more runtime behavior:
 - Pull-up/pull-down requirements for digital inputs.
 - Sensor calibration and units for pressure, flow, and NTC temperature.
 - Protection thresholds and diagnostic IDs.
-- Whether brake fault should be EXTI-triggered, a polled protection, or both.
+- Whether brake fault should remain a polled protection only or also become EXTI-triggered.
 - Exact flow-sensor abstraction. ST-LIB currently provides TIM23 input-capture support, but no dedicated flow/pulse sensor wrapper has been selected.
 - Final pressure, flow, and temperature packet units once calibration is defined.
 
