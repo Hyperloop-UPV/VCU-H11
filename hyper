@@ -1127,7 +1127,9 @@ def handle_hardfault_analysis(_: argparse.Namespace) -> int:
 
 
 def add_build_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("target", nargs="?", default="main", help="Firmware target: main")
+    parser.add_argument(
+        "target", nargs="?", default="main", help="Firmware target: main"
+    )
     parser.add_argument(
         "--preset", default=DEFAULT_PRESET, help="CMake preset to build"
     )
@@ -1178,9 +1180,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     flash_parser.set_defaults(func=handle_flash)
 
-    run_parser = subparsers.add_parser(
-        "run", help="Build then flash the VCU firmware"
-    )
+    run_parser = subparsers.add_parser("run", help="Build then flash the VCU firmware")
     add_build_arguments(run_parser)
     run_parser.add_argument(
         "--elf", type=Path, default=LATEST_ELF, help="ELF image to flash after build"
