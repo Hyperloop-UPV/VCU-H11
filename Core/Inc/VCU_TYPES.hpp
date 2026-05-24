@@ -208,6 +208,10 @@ inline ST_LIB::EXTIDomain::Instance* sdc_closed_interrupt = nullptr;
 inline ST_LIB::TimerWrapper<flow_timer_req> flow_timer;
 
 inline constexpr float uncalibrated_linear_gain = 1.0f;
+inline constexpr float LOW_PRESSURE_SLOPE = 3.5129857652111625;
+inline constexpr float LOW_PRESSURE_OFFSET = -1.6994576891102104;
+inline constexpr float HIGH_PRESSURE_SLOPE = 112.25464988418591;
+inline constexpr float HIGH_PRESSURE_OFFSET = -38.599525119896384;
 inline constexpr float uncalibrated_linear_offset = 0.0f;
 
 inline uint8_t general_state = static_cast<uint8_t>(GeneralState::Connecting);

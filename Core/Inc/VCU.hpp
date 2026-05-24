@@ -63,14 +63,14 @@ inline void init() {
 
     high_pressure_sensor = LinearSensor<float>(
         Board::instance_of<high_pressure_adc_req>(),
-        uncalibrated_linear_gain,
-        uncalibrated_linear_offset,
+        HIGH_PRESSURE_SLOPE,
+        HIGH_PRESSURE_OFFSET,
         high_pressure
     );
     low_pressure_sensor = LinearSensor<float>(
         Board::instance_of<low_pressure_adc_req>(),
-        uncalibrated_linear_gain,
-        uncalibrated_linear_offset,
+        LOW_PRESSURE_SLOPE,
+        LOW_PRESSURE_OFFSET,
         low_pressure
     );
     pressure_regulator_out_sensor = LinearSensor<float>(
