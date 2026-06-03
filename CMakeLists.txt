@@ -28,6 +28,7 @@ else()
 endif()
 
 option(USE_ETHERNET "Enable ethernet peripheral" OFF)
+option(SINGLE "Build VCU for single-board testing without remote-board sockets" OFF)
 option(TARGET_NUCLEO "Targets the STM32H723 Nucleo development board" OFF)
 option(USE_CCACHE "Use ccache if available" ON)
 if(NOT USE_ETHERNET)
@@ -53,6 +54,7 @@ endif()
 
 message(STATUS "VCU-H11: CMAKE_CROSSCOMPILING = ${CMAKE_CROSSCOMPILING}")
 message(STATUS "VCU-H11: USE_ETHERNET         = ${USE_ETHERNET}")
+message(STATUS "VCU-H11: SINGLE               = ${SINGLE}")
 message(STATUS "VCU-H11: TARGET_NUCLEO        = ${TARGET_NUCLEO}")
 message(STATUS "VCU-H11: BOARD_NAME           = ${BOARD_NAME}")
 
@@ -145,6 +147,7 @@ if(CMAKE_CROSSCOMPILING)
 
   target_compile_definitions(${EXECUTABLE} PRIVATE
     $<$<BOOL:${USE_ETHERNET}>:STLIB_ETH>
+    $<$<BOOL:${SINGLE}>:SINGLE>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,NUCLEO,BOARD>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,HSE_VALUE=8000000,HSE_VALUE=25000000>
   )

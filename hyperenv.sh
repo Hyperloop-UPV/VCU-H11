@@ -23,4 +23,10 @@ runeth() {
     cd -
 }
 
+runsingle() {
+    cd "$VCU_ROOT"
+    ./hyper run main --preset board-debug-eth-lan8700-single --board-name VCU --skip-preflight
+    cd -
+}
+
 unset _VCU_HYPERENV_PATH

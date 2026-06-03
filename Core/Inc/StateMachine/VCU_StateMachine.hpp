@@ -80,47 +80,63 @@ inline bool send_remote_order(auto* socket, HeapOrder* order, const char* descri
 }
 
 inline void request_open_contactors() {
+#ifdef SINGLE
+    VCU::contactors_closed = false;
+#else
     if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected() &&
         OrderPackets::Remote_open_contactors_order != nullptr) {
         OrderPackets::hvbms_tcp->send_order(*OrderPackets::Remote_open_contactors_order);
     }
     VCU::contactors_closed = false;
+#endif
 }
 
 inline void request_precharge() {
+#ifdef SINGLE
+    VCU::contactors_closed = true;
+#else
     send_remote_order(
         OrderPackets::hvbms_tcp,
         OrderPackets::Remote_precharge_order,
         "precharge"
     );
+#endif
 }
 
 inline void stop_propulsion() {
+#ifndef SINGLE
     send_remote_order(
         OrderPackets::pcu_tcp,
         OrderPackets::Remote_stop_motor_order,
         "stop propulsion"
     );
+#endif
 }
 
 inline void stop_levitation() {
+#ifndef SINGLE
     send_remote_order(
         OrderPackets::lcu_tcp,
         OrderPackets::Remote_stop_levitation_order,
         "stop levitation"
     );
+#endif
 }
 
 inline void start_propulsion() {
+#ifndef SINGLE
     send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Remote_runs_order, "propulsion");
+#endif
 }
 
 inline void start_static_levitation() {
+#ifndef SINGLE
     send_remote_order(
         OrderPackets::lcu_tcp,
         OrderPackets::Remote_levitation_order,
         "static levitation"
     );
+#endif
 }
 
 inline void start_dynamic_levitation() {
@@ -129,6 +145,7 @@ inline void start_dynamic_levitation() {
 }
 
 inline void propagate_fault() {
+#ifndef SINGLE
     if (OrderPackets::pcu_tcp != nullptr && OrderPackets::pcu_tcp->is_connected()) {
         OrderPackets::pcu_tcp->send_order(*OrderPackets::FAULT_order);
     }
@@ -138,15 +155,23 @@ inline void propagate_fault() {
     if (OrderPackets::lcu_tcp != nullptr && OrderPackets::lcu_tcp->is_connected()) {
         OrderPackets::lcu_tcp->send_order(*OrderPackets::FAULT_order);
     }
+#endif
 }
 
 inline void refresh_connections() {
     VCU::control_station_connected = socket_connected(OrderPackets::control_station_tcp);
+#ifdef SINGLE
+    VCU::hvbms_connected = false;
+    VCU::pcu_connected = false;
+    VCU::lcu_connected = false;
+    VCU::required_peers_connected = VCU::control_station_connected;
+#else
     VCU::hvbms_connected = socket_connected(OrderPackets::hvbms_tcp);
     VCU::pcu_connected = socket_connected(OrderPackets::pcu_tcp);
     VCU::lcu_connected = socket_connected(OrderPackets::lcu_tcp);
     VCU::required_peers_connected = VCU::control_station_connected && VCU::hvbms_connected &&
                                     VCU::pcu_connected && VCU::lcu_connected;
+#endif
 
     if (VCU::required_peers_connected) {
         VCU::required_peers_were_connected = true;
@@ -334,7 +359,13 @@ inline void handle_precharging() {
         return;
     }
 
-    if (VCU::hvbms_state == static_cast<uint8_t>(VCU::HVBMSState::Closed)) {
+    if (
+#ifdef SINGLE
+        VCU::contactors_closed
+#else
+        VCU::hvbms_state == static_cast<uint8_t>(VCU::HVBMSState::Closed)
+#endif
+    ) {
         VCU::contactors_closed = true;
         transition_to(VCU::OperationalState::HVActive);
         return;
@@ -397,6 +428,9 @@ inline void handle_static_levitation_orders() {
 }
 
 inline void handle_propulsion_orders() {
+#ifdef SINGLE
+    return;
+#else
     if (!is_state(VCU::OperationalState::Propulsion) &&
         !is_state(VCU::OperationalState::DynamicLevitation)) {
         return;
@@ -434,9 +468,13 @@ inline void handle_propulsion_orders() {
             "motor brake"
         );
     }
+#endif
 }
 
 inline void handle_levitation_orders() {
+#ifdef SINGLE
+    return;
+#else
     if (!is_state(VCU::OperationalState::StaticLevitation) &&
         !is_state(VCU::OperationalState::DynamicLevitation)) {
         return;
@@ -450,9 +488,11 @@ inline void handle_levitation_orders() {
             "levitation"
         );
     }
+#endif
 }
 
 inline void clear_remote_callback_flags() {
+#ifndef SINGLE
     OrderPackets::Remote_close_contactors_flag = false;
     OrderPackets::Remote_open_contactors_flag = false;
     OrderPackets::Remote_precharge_flag = false;
@@ -467,6 +507,7 @@ inline void clear_remote_callback_flags() {
     OrderPackets::Remote_booster_flag = false;
     OrderPackets::Remote_stop_booster_flag = false;
     OrderPackets::Forward_booster_flag = false;
+#endif
 }
 
 inline void handle_orders() {

@@ -46,6 +46,14 @@ VCU-H11 requires Ethernet. Do not support or maintain non-Ethernet VCU builds;
 application code intentionally fails compilation when `STLIB_ETH` is not
 defined.
 
+For isolated VCU bench testing, the firmware supports a `SINGLE` compile mode.
+Build it with the `board-debug-eth-lan8700-single` preset while the nested ADJ
+repository is on branch `vcu/single`. That ADJ branch removes remote-board
+sockets and packets/orders, leaving only the control-station links and local VCU
+telemetry/orders. In `SINGLE`, required peer connectivity means control-station
+connectivity only, remote-board command forwarding is compiled out, and
+precharge completion is simulated locally by marking contactors closed.
+
 `VCU::update()` should keep servicing infrastructure each loop:
 
 - `FaultController::check_transitions()`

@@ -109,11 +109,16 @@ inline void init() {
         tapes_reached,
         contactors_closed,
         control_station_connected,
+#ifdef SINGLE
+        required_peers_connected
+#else
         hvbms_connected,
         pcu_connected,
         lcu_connected,
         required_peers_connected
+#endif
     );
+#ifndef SINGLE
     DataPackets::HVBMS_State_init(hvbms_state);
     DataPackets::LCU_State_init(lcu_vertical_state, lcu_horizontal_state);
     DataPackets::PCU_State_init(pcu_state);
@@ -124,9 +129,9 @@ inline void init() {
         lcu_horizontal_state
     );
     DataPackets::VCU_State_For_PCU_init(recovery_status);
+#endif
 
     OrderPackets::FAULT_init();
-    OrderPackets::Recovery_init();
     OrderPackets::Cooling_pump_power_init(cooling_pump_duty, cooling_pump_selection);
     OrderPackets::MANTEINANCE_init();
     OrderPackets::Precharge_init();
@@ -135,10 +140,16 @@ inline void init() {
     OrderPackets::Static_levitation_init();
     OrderPackets::Dynamic_levitation_init();
     OrderPackets::Brake_init();
+#ifndef SINGLE
+    OrderPackets::Recovery_init();
     OrderPackets::Close_contactors_init();
+#endif
     OrderPackets::Unbrake_init();
+#ifndef SINGLE
     OrderPackets::Open_contactors_init();
+#endif
     OrderPackets::Emergency_stop_init();
+#ifndef SINGLE
     OrderPackets::Runs_init(run_id);
     OrderPackets::SVPWM_init(
         modulation_frequency_1,
@@ -197,6 +208,7 @@ inline void init() {
     OrderPackets::Remote_booster_init();
     OrderPackets::Remote_stop_booster_init();
     OrderPackets::Forward_booster_init();
+#endif
 
     OrderPackets::start();
     DataPackets::start();

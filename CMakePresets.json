@@ -147,6 +147,19 @@
             }
         },
         {
+            "name": "board-debug-eth-lan8700-single",
+            "displayName": "Board [DBG] [ETH] [LAN8700] [SINGLE]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "LAN8700",
+                "SINGLE": "ON"
+            }
+        },
+        {
             "name": "board-release-eth-ksz8041",
             "displayName": "Board [REL] [ETH] [KSZ8041]",
             "inherits": [
@@ -260,6 +273,10 @@
         {
             "name": "board-debug-eth-lan8700",
             "configurePreset": "board-debug-eth-lan8700"
+        },
+        {
+            "name": "board-debug-eth-lan8700-single",
+            "configurePreset": "board-debug-eth-lan8700-single"
         },
         {
             "name": "board-release-eth-ksz8041",
