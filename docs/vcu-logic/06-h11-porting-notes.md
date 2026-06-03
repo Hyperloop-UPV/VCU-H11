@@ -33,7 +33,7 @@ The H10 classes map naturally to these H11 responsibilities:
 
 ## Implementation Sequence
 
-1. Define required remote peers for H11. At minimum H10 required control station, HVSCU, and PCU before `Operational`.
+1. Define required remote peers for H11. At minimum H10 required control station, HVBMS, and PCU before `Operational`.
 2. Implement operational states without a `Fault` enum value: `Idle`, `EndOfRun`, `Energized`, `Ready`, `Demonstration`, `Recovery`.
 3. Add clear state transition predicates for contactors, brakes, recovery, and demonstration bitfield.
 4. Add local brake behavior after active levels are confirmed. Keep regulator pressure manual and firmware-observed only.
@@ -64,8 +64,8 @@ The H11 code now implements the major H10 business-logic gaps deliberately rathe
 
 - command dispatchers exist for brake, unbrake, contactors, pumps, recovery, and remote-board commands;
 - operational state transitions are derived from contactor status, brake status, recovery request, and the demonstration bitfield;
-- generated sockets cover the control station, HVSCU, PCU, LCU, and BCU paths used by the dispatcher;
-- remote acknowledgements are tracked for HVSCU, PCU, LCU, and booster behavior;
+- generated sockets cover the control station, HVBMS, PCU, LCU, and BCU paths used by the dispatcher;
+- remote acknowledgements are tracked for HVBMS, PCU, LCU, and booster behavior;
 - H11 does not expose pressure-regulator control because a manual regulator is used;
 - fault entry turns local outputs to their safe firmware-owned states and commands the brake active.
 

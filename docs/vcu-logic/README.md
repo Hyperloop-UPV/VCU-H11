@@ -17,7 +17,7 @@ Use these documents as the behavioral reference when implementing H11 firmware. 
 
 ## Mental Model
 
-The VCU is the vehicle master. It is the coordinator between the operator/control station, local hardware attached to the VCU, and remote vehicle boards such as HVSCU, PCU, and LCU.
+The VCU is the vehicle master. It is the coordinator between the operator/control station, local hardware attached to the VCU, and remote vehicle boards such as HVBMS, PCU, and LCU.
 
 At a high level, each loop does four jobs:
 
@@ -26,7 +26,7 @@ At a high level, each loop does four jobs:
 3. Read local sensors and publish telemetry.
 4. Process accepted orders, forward remote requests, and fault if safety assumptions are violated.
 
-The VCU does not directly implement every vehicle subsystem. Instead, it arbitrates when other boards may act. For example, it does not close the high-voltage contactors itself; it sends the contactor order to HVSCU, waits until HVSCU reports the expected state, then updates the VCU's own operational state.
+The VCU does not directly implement every vehicle subsystem. Instead, it arbitrates when other boards may act. For example, it does not close the high-voltage contactors itself; it sends the contactor order to HVBMS, waits until HVBMS reports the expected state, then updates the VCU's own operational state.
 
 ## Source Caveats
 

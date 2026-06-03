@@ -16,10 +16,17 @@ Extracted H10-V2 business-logic docs live in `docs/vcu-logic/`. They describe th
 
 Stable H10 behavior to preserve in H11 intent:
 
-- Required peer connectivity gates normal operation. In the inspected H10 code, control station, HVSCU, and PCU were required for the transition from connecting to operational.
-- Normal operational modes are `Idle`, `EndOfRun`, `Energized`, `Ready`, `Demonstration`, and `Recovery`; `EndOfRun` was declared in H10 but had no implemented transitions in the inspected snapshot.
-- Orders should be validated against operational state before acting. Remote orders should wait for remote-board state acknowledgement and fault on timeout.
+- Required peer connectivity gates normal operation.
+- Orders should be validated against operational state before acting.
 - Local fault/safety behavior includes SDC-open faulting, emergency-stop propagation, brake-on-fault intent, and tape/brake reed checks that need active-level and safety review before H11 implementation.
+
+Current H11 product state machine:
+
+- The explicit VCU states are `Idle`, `Connected`, `Manteinance`, `Precharging`, `HVActive`, `Ready`, `Propulsion`, `StaticLevitation`, `DynamicLevitation`, and `Fault`.
+- `Idle` transitions to `Connected` only when the control station and required boards are connected. The current required peers are control station, HVBMS, PCU, and LCU.
+- `Connected` accepts high-level `MANTEINANCE` and `Precharge` orders. `Stop` returns commandable non-idle modes to `Connected`.
+- `Precharging` sends the formal HVBMS precharge request through the existing high-voltage remote link until a dedicated HVBMS socket/state packet is defined.
+- `Fault` is intentionally part of the current formal product state machine by explicit user request. ST-LIB protections and `FaultController` still provide the underlying fault trigger infrastructure.
 
 ## Current Firmware Shape
 
@@ -27,10 +34,15 @@ Stable H10 behavior to preserve in H11 intent:
 - Main VCU facade: `Core/Inc/VCU.hpp`.
 - Device requests, global runtime pointers, and app state: `Core/Inc/VCU_TYPES.hpp`.
 - State machine skeleton: `Core/Inc/StateMachine/VCU_StateMachine.hpp`.
+- Declarative operational FSM spec: `docs/vcu_state_machine.yaml`.
 - Hardware pin aliases: `Core/Inc/Pinout/Pinout.hpp`.
 - Packet schemas: `Core/Inc/Code_generation/JSON_ADE/boards/VCU/`.
 
-Generated Ethernet comms bind the control-station UDP telemetry socket plus PCU, HVSCU, and LCU UDP sockets. The remote UDP sockets are needed because incoming state packets update the global `HeapPacket` values that the VCU uses for acknowledgement tracking.
+Generated Ethernet comms bind the control-station UDP telemetry socket plus PCU, HVBMS, and LCU UDP sockets. The remote UDP sockets are needed because incoming state packets update the global `HeapPacket` values that the VCU uses for acknowledgement tracking.
+
+VCU-H11 requires Ethernet. Do not support or maintain non-Ethernet VCU builds;
+application code intentionally fails compilation when `STLIB_ETH` is not
+defined.
 
 `VCU::update()` should keep servicing infrastructure each loop:
 
@@ -38,6 +50,8 @@ Generated Ethernet comms bind the control-station UDP telemetry socket plus PCU,
 - `Board::evaluate_protections()`
 - `Diagnostics::Hub::flush()`
 - `Scheduler::update()`
+
+`docs/vcu_state_machine.yaml` describes the current H11 FSM in the formal format from `docs/fsm_format_spec.md`, and `docs/vcu_state_machine_diagram.md` renders the same flow as Mermaid.
 
 ## ST-LIB Board Conventions
 
@@ -57,18 +71,9 @@ Use the most abstract ST-LIB object that matches the hardware role. For example,
 
 ## Faults, Protections, Diagnostics
 
-After the latest ST-LIB release, FAULT state ownership belongs to infrastructure, not the application state machine.
+ST-LIB protections and diagnostics remain the mechanism for detecting and entering fault behavior. Current scaffold uses `ST_LIB::FaultPolicyNoMachine<on_fault_enter>`.
 
-VCU app state should describe operational modes only, for example:
-
-- `Idle`
-- `EndOfRun`
-- `Energized`
-- `Ready`
-- `Demonstration`
-- `Recovery`
-
-Do not add `Fault` to the VCU operational state enum. Use ST-LIB protections and diagnostics for fault behavior. Current scaffold uses `ST_LIB::FaultPolicyNoMachine<on_fault_enter>`.
+By explicit user request, the current VCU product FSM also exposes `Fault` as a formal state and telemetry value. Keep ST-LIB protection/fault policy as the trigger infrastructure; do not replace it with ad hoc HAL checks.
 
 Relevant ST-LIB docs:
 
@@ -163,15 +168,18 @@ ST_LIB::EthernetDomain::PINSET_H11
 Prefer the local CLI:
 
 ```bash
-./hyper build main --preset board-debug --board-name VCU
 ./hyper build main --preset board-debug-eth-lan8700 --board-name VCU
 ```
 
 Known passing checks:
 
-- `./hyper build main --preset board-debug --board-name VCU`
 - `./hyper build main --preset board-debug-eth-lan8700 --board-name VCU`
 - `python3 -m py_compile hyper`
+
+Known intentional failure:
+
+- `./hyper build main --preset board-debug --board-name VCU` fails because
+  `STLIB_ETH` is not defined.
 
 When modifying ADJ files under `Core/Inc/Code_generation/JSON_ADE`, run the ADJ validator before handoff. The validator depends on `jsonschema`; install the pinned tester requirements into the repository virtual environment when needed:
 

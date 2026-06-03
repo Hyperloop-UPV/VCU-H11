@@ -1,0 +1,435 @@
+schema_version: "1.0"
+
+machine: VCUStateMachine
+
+description: >
+  Explicit Vehicle Control Unit state machine. The VCU starts disconnected,
+  waits for the control station and required boards, then accepts high-level
+  operating orders. Any protection trigger or control-station disconnect enters
+  FAULT.
+
+metadata:
+  target_language: cpp
+  intended_platform: embedded
+  source_files:
+    - Core/Inc/StateMachine/VCU_StateMachine.hpp
+    - Core/Inc/VCU_TYPES.hpp
+  codegen:
+    externalize_guards: true
+    externalize_actions: true
+    state_enum_prefix: VCU_STATE_
+    event_enum_prefix: VCU_EVENT_
+    function_prefix: VCUStateMachine_
+  notes:
+    - "The order/state name MANTEINANCE preserves the requested spelling."
+    - >
+      Current firmware maps the formal HVBMS precharge command/completion path
+      to the existing high-voltage remote link and state packet until a
+      dedicated HVBMS socket/state packet is defined.
+
+initial_state: IDLE
+
+unhandled_event_policy:
+  behavior: log
+  action: log_unhandled_event
+
+context:
+  variables:
+    - name: control_station_connected
+      type: bool
+      access: read
+      initial_value: false
+
+    - name: hvbms_connected
+      type: bool
+      access: read
+      initial_value: false
+
+    - name: pcu_connected
+      type: bool
+      access: read
+      initial_value: false
+
+    - name: lcu_connected
+      type: bool
+      access: read
+      initial_value: false
+
+    - name: required_peers_connected
+      type: bool
+      access: read
+      initial_value: false
+      description: Control station, HVBMS, PCU, and LCU are connected.
+
+    - name: sdc_closed
+      type: bool
+      access: read
+      initial_value: false
+
+    - name: brake_fault_detected
+      type: bool
+      access: read
+      initial_value: false
+
+    - name: contactors_closed
+      type: bool
+      access: read_write
+      initial_value: false
+
+    - name: active_brakes
+      type: bool
+      access: read_write
+      initial_value: true
+
+    - name: hvbms_state
+      type: uint8_t
+      access: read
+      initial_value: 0
+      description: Existing high-voltage board state packet; Closed is currently used as precharge complete.
+
+states:
+  - name: IDLE
+    type: normal
+    description: VCU is safe and waiting for required communication links.
+    on_entry:
+      - brake
+      - open_contactors
+      - sync_state_telemetry
+
+  - name: CONNECTED
+    type: normal
+    description: Required communication links are present; waits for MANTEINANCE or PRECHARGE.
+    on_entry:
+      - brake
+      - open_contactors
+      - sync_state_telemetry
+
+  - name: MANTEINANCE
+    type: normal
+    description: Maintenance mode; waits for STOP.
+    on_entry:
+      - unbrake
+      - sync_state_telemetry
+
+  - name: PRECHARGING
+    type: normal
+    description: Precharge has been requested; waits for STOP or precharge completion.
+    on_entry:
+      - send_hvbms_precharge
+      - sync_state_telemetry
+
+  - name: HV_ACTIVE
+    type: normal
+    description: High voltage is active; waits for STOP or UNBRAKE.
+    on_entry:
+      - sync_state_telemetry
+
+  - name: READY
+    type: normal
+    description: Vehicle is unbraked and ready for propulsion or levitation orders.
+    on_entry:
+      - unbrake
+      - sync_state_telemetry
+
+  - name: PROPULSION
+    type: normal
+    description: Propulsion mode; waits for specific propulsion orders.
+    on_entry:
+      - start_propulsion
+      - sync_state_telemetry
+    on_exit:
+      - stop_propelling
+
+  - name: STATIC_LEVITATION
+    type: normal
+    description: Static levitation mode; waits for levitation orders or dynamic levitation.
+    on_entry:
+      - start_static_levitation
+      - sync_state_telemetry
+    on_exit:
+      - stop_levitating
+
+  - name: DYNAMIC_LEVITATION
+    type: normal
+    description: Dynamic levitation mode; waits for dynamic levitation orders.
+    on_entry:
+      - start_dynamic_levitation
+      - sync_state_telemetry
+    on_exit:
+      - stop_propelling
+      - stop_levitating
+
+  - name: FAULT
+    type: fault
+    description: Faulted safe state.
+    on_entry:
+      - open_sdc
+      - turn_on_fault_led
+      - propagate_fault
+      - open_contactors
+      - brake
+      - sync_state_telemetry
+
+events:
+  - name: CONNECTIONS_READY
+    source: communications
+    description: Control station and all required boards are connected.
+
+  - name: ORDER_MANTEINANCE
+    source: control_station
+
+  - name: ORDER_PRECHARGE
+    source: control_station
+
+  - name: ORDER_STOP
+    source: control_station
+
+  - name: PRECHARGE_COMPLETE
+    source: hvbms
+
+  - name: ORDER_UNBRAKE
+    source: control_station
+
+  - name: ORDER_BRAKE
+    source: control_station
+
+  - name: ORDER_PROPULSION
+    source: control_station
+
+  - name: ORDER_STATIC_LEVITATION
+    source: control_station
+
+  - name: ORDER_DYNAMIC_LEVITATION
+    source: control_station
+
+  - name: PROPULSION_ORDER
+    source: control_station
+    description: Low-level propulsion command accepted only in PROPULSION or DYNAMIC_LEVITATION.
+
+  - name: STATIC_LEVITATION_ORDER
+    source: control_station
+    description: Low-level levitation command accepted only in STATIC_LEVITATION or DYNAMIC_LEVITATION.
+
+  - name: PROTECTION_TRIGGERED
+    source: protection
+
+  - name: CONTROL_STATION_DISCONNECTED
+    source: communications
+
+guards:
+  - name: all_required_peers_connected
+    expression: required_peers_connected == true
+    dependencies:
+      - required_peers_connected
+
+  - name: precharge_finished
+    expression: hvbms_state == 2
+    dependencies:
+      - hvbms_state
+    description: Temporary implementation guard for HVBMS precharge completion.
+
+  - name: protection_active
+    expression: sdc_closed == false || brake_fault_detected == true
+    dependencies:
+      - sdc_closed
+      - brake_fault_detected
+
+  - name: control_station_lost
+    expression: control_station_connected == false
+    dependencies:
+      - control_station_connected
+
+actions:
+  - name: brake
+    function: action_brake
+    modifies:
+      - active_brakes
+
+  - name: unbrake
+    function: action_unbrake
+    modifies:
+      - active_brakes
+
+  - name: open_contactors
+    function: action_open_contactors
+    modifies:
+      - contactors_closed
+
+  - name: send_hvbms_precharge
+    function: action_send_hvbms_precharge
+
+  - name: start_propulsion
+    function: action_start_propulsion
+
+  - name: stop_propelling
+    function: action_stop_propelling
+
+  - name: start_static_levitation
+    function: action_start_static_levitation
+
+  - name: start_dynamic_levitation
+    function: action_start_dynamic_levitation
+
+  - name: stop_levitating
+    function: action_stop_levitating
+
+  - name: open_sdc
+    function: action_open_sdc
+    description: Formal action; H11 currently exposes SDC as an input, not as a controllable output.
+
+  - name: turn_on_fault_led
+    function: action_turn_on_fault_led
+
+  - name: propagate_fault
+    function: action_propagate_fault
+
+  - name: sync_state_telemetry
+    function: action_sync_state_telemetry
+
+  - name: forward_propulsion_order
+    function: action_forward_propulsion_order
+
+  - name: forward_static_levitation_order
+    function: action_forward_static_levitation_order
+
+  - name: log_unhandled_event
+    function: action_log_unhandled_event
+
+transitions:
+  - from: IDLE
+    event: CONNECTIONS_READY
+    guard: all_required_peers_connected
+    to: CONNECTED
+    priority: 10
+
+  - from: CONNECTED
+    event: ORDER_MANTEINANCE
+    to: MANTEINANCE
+    priority: 10
+
+  - from: CONNECTED
+    event: ORDER_PRECHARGE
+    to: PRECHARGING
+    priority: 10
+
+  - from: MANTEINANCE
+    event: ORDER_STOP
+    to: CONNECTED
+    priority: 10
+
+  - from: PRECHARGING
+    event: ORDER_STOP
+    to: CONNECTED
+    priority: 10
+
+  - from: PRECHARGING
+    event: PRECHARGE_COMPLETE
+    guard: precharge_finished
+    to: HV_ACTIVE
+    actions:
+      - sync_state_telemetry
+    priority: 10
+
+  - from: HV_ACTIVE
+    event: ORDER_STOP
+    to: CONNECTED
+    priority: 10
+
+  - from: HV_ACTIVE
+    event: ORDER_UNBRAKE
+    to: READY
+    priority: 10
+
+  - from: READY
+    event: ORDER_STOP
+    to: CONNECTED
+    priority: 10
+
+  - from: READY
+    event: ORDER_BRAKE
+    to: HV_ACTIVE
+    actions:
+      - brake
+    priority: 10
+
+  - from: READY
+    event: ORDER_PROPULSION
+    to: PROPULSION
+    priority: 10
+
+  - from: READY
+    event: ORDER_STATIC_LEVITATION
+    to: STATIC_LEVITATION
+    priority: 10
+
+  - from: READY
+    event: ORDER_DYNAMIC_LEVITATION
+    to: DYNAMIC_LEVITATION
+    priority: 10
+
+  - from: STATIC_LEVITATION
+    event: ORDER_DYNAMIC_LEVITATION
+    to: DYNAMIC_LEVITATION
+    priority: 10
+
+  - from: PROPULSION
+    event: ORDER_STOP
+    to: CONNECTED
+    priority: 10
+    description: Added so PROPULSION has a commanded exit and its on_exit action can run.
+
+  - from: STATIC_LEVITATION
+    event: ORDER_STOP
+    to: CONNECTED
+    priority: 10
+    description: Added so STATIC_LEVITATION has a commanded exit and its on_exit action can run.
+
+  - from: DYNAMIC_LEVITATION
+    event: ORDER_STOP
+    to: CONNECTED
+    priority: 10
+    description: Added so DYNAMIC_LEVITATION has a commanded exit and its on_exit actions can run.
+
+  - from: PROPULSION
+    event: PROPULSION_ORDER
+    to: PROPULSION
+    internal: true
+    actions:
+      - forward_propulsion_order
+    priority: 20
+
+  - from: DYNAMIC_LEVITATION
+    event: PROPULSION_ORDER
+    to: DYNAMIC_LEVITATION
+    internal: true
+    actions:
+      - forward_propulsion_order
+    priority: 20
+
+  - from: STATIC_LEVITATION
+    event: STATIC_LEVITATION_ORDER
+    to: STATIC_LEVITATION
+    internal: true
+    actions:
+      - forward_static_levitation_order
+    priority: 20
+
+  - from: DYNAMIC_LEVITATION
+    event: STATIC_LEVITATION_ORDER
+    to: DYNAMIC_LEVITATION
+    internal: true
+    actions:
+      - forward_static_levitation_order
+    priority: 20
+
+  - from: "*"
+    event: PROTECTION_TRIGGERED
+    guard: protection_active
+    to: FAULT
+    priority: 0
+
+  - from: "*"
+    event: CONTROL_STATION_DISCONNECTED
+    guard: control_station_lost
+    to: FAULT
+    priority: 0

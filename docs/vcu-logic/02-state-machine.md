@@ -1,106 +1,86 @@
 # State Machine
 
-## Startup Flow
+The current H11 VCU state machine is an explicit product FSM implemented in
+`Core/Inc/StateMachine/VCU_StateMachine.hpp` and specified formally in
+`docs/vcu_state_machine.yaml`.
 
-The H10 application starts in two phases:
-
-1. `VCU::init()` creates the state machines, links protections to the general fault state, sets the VCU protection ID, and initializes VCU subsystems.
-2. `main()` starts ST-LIB networking, waits 4 seconds, then calls `VCU::start()` and enables state-machine checks.
-
-After startup, the main loop calls the ST-LIB update path and then `VCU::update()`.
-
-The H10 `VCU::update()` loop performs this work:
-
-1. If the delayed start flag is enabled, check general and operational state transitions.
-2. Process communication order flags.
-3. Read sensors when the cyclic scheduler requested it.
-4. Send telemetry when the cyclic scheduler requested it.
-5. Check protections.
-
-## General State Machine
-
-The general state machine represents whether the VCU is connected, operational, or faulted.
+## States
 
 | State | Meaning | Entry behavior |
 | --- | --- | --- |
-| `Connecting` | The VCU is waiting for required network peers. | Operational LED blinks. |
-| `Operational` | Required peers are connected and the nested operational state machine is active. | Operational LED is solid. |
-| `Fault` | A safety condition, connection loss, emergency order, or timeout occurred. | Fault LED blinks and brake is scheduled after 100 ms. |
+| `Idle` | Safe initial state waiting for required communication links. | Brake, open contactors, publish state. |
+| `Connected` | Required links are connected and the VCU waits for high-level orders. | Brake, open contactors, publish state. |
+| `Manteinance` | Maintenance mode. The spelling follows the current order/state contract. | Unbrake, publish state. |
+| `Precharging` | Precharge has been requested. | Send the formal HVBMS precharge request, publish state. |
+| `HVActive` | High voltage is active. | Publish state. |
+| `Ready` | Vehicle is unbraked and ready for propulsion or levitation mode selection. | Unbrake, publish state. |
+| `Propulsion` | Propulsion mode. | Start propulsion, publish state. |
+| `StaticLevitation` | Static levitation mode. | Start static levitation, publish state. |
+| `DynamicLevitation` | Dynamic levitation mode. | Start dynamic levitation, publish state. |
+| `Fault` | Faulted safe state. | Open SDC formally, turn on fault LED, propagate fault, open contactors, brake, publish state. |
 
-For H11, keep the behavior but do not model `Fault` as an application state. Fault transitions belong to the ST-LIB fault infrastructure.
+`open_sdc` is currently formal only: H11 exposes `sdc_closed` as an input and
+protection, not as a controllable output.
 
-### General Transitions
+## Required Links
 
-| From | To | Condition in H10 |
+`Idle` transitions to `Connected` when the VCU is connected to:
+
+- control station;
+- HVBMS;
+- PCU;
+- LCU.
+
+The precharge flow is named as HVBMS-facing in the formal FSM. The current code
+uses the existing high-voltage remote link/state packet until a dedicated HVBMS
+socket and state packet are defined.
+
+## Transitions
+
+| From | To | Trigger |
 | --- | --- | --- |
-| `Connecting` | `Operational` | Control station TCP, HVSCU TCP, and PCU TCP are connected. |
-| `Operational` | `Fault` | Control station, HVSCU, or PCU TCP disconnects. |
-| `Connecting` or `Operational` | `Fault` | All monitored brake reeds are active after the first brake sequence has occurred. |
-| `Operational` | `Fault` | SDC input is false/open. |
-| `Operational` | `Fault` | Emergency tape input trips while the H10 tape-enable status is `ON`, which is the status set by `on_Disable_tapes()` on entry to `Ready` and `Demonstration`. |
+| `Idle` | `Connected` | Required links are connected. |
+| `Connected` | `Manteinance` | `MANTEINANCE` order. |
+| `Connected` | `Precharging` | `Precharge` order. |
+| `Manteinance` | `Connected` | `Stop` order. |
+| `Precharging` | `Connected` | `Stop` order. |
+| `Precharging` | `HVActive` | Precharge completion from the high-voltage board. |
+| `HVActive` | `Connected` | `Stop` order. |
+| `HVActive` | `Ready` | `Unbrake` order. |
+| `Ready` | `Connected` | `Stop` order. |
+| `Ready` | `HVActive` | `Brake` order. |
+| `Ready` | `Propulsion` | `Propulsion` order. |
+| `Ready` | `StaticLevitation` | `Static levitation` order. |
+| `Ready` | `DynamicLevitation` | `Dynamic levitation` order. |
+| `StaticLevitation` | `DynamicLevitation` | `Dynamic levitation` order. |
+| `Propulsion` | `Connected` | `Stop` order. |
+| `StaticLevitation` | `Connected` | `Stop` order. |
+| `DynamicLevitation` | `Connected` | `Stop` order. |
+| Any state | `Fault` | Protection trigger or control-station disconnect after connection. |
 
-BMSL, LCU, and BCU connection checks existed as commented code in the inspected H10 snapshot. Their intent should be revisited before treating them as required H11 peers.
+The `Stop` exits from `Propulsion`, `StaticLevitation`, and
+`DynamicLevitation` are included so their exit actions can run:
 
-### General Cyclic Work
+- exiting `Propulsion` stops propelling;
+- exiting `StaticLevitation` stops levitating;
+- exiting `DynamicLevitation` stops propelling and levitating.
 
-The H10 state machine schedules these actions every 100 ms in all general states:
+## Active-Mode Orders
 
-- mark telemetry packets for sending;
-- mark sensors for reading.
+Low-level propulsion orders are only forwarded in `Propulsion` and
+`DynamicLevitation`.
 
-While connecting, it also periodically reconnects HVSCU and PCU sockets if they are disconnected. BMSL and LCU reconnect paths were present but commented.
+Low-level levitation orders are only forwarded in `StaticLevitation` and
+`DynamicLevitation`.
 
-## Operational State Machine
+## Fault Handling
 
-The operational state machine is nested under `Operational` and represents the vehicle's usable modes.
+ST-LIB protections and `FaultController` remain the trigger infrastructure.
+The formal VCU FSM also exposes `Fault` as a state and telemetry value. Fault
+entry applies the safe-output policy currently implemented by the VCU:
 
-| State | Meaning |
-| --- | --- |
-| `Idle` | Initial state. Contactors are considered open and motion actions are not allowed. |
-| `Energized` | Contactors are considered closed, but brakes are still active. |
-| `Ready` | Contactors are closed and brakes are released. Motion-related commands can be accepted. |
-| `Demonstration` | At least one demonstration/run action is active. |
-| `Recovery` | Recovery mode requested or emergency tape condition observed from idle. |
-| `EndOfRun` | Declared in H10, but no transitions were implemented in the inspected snapshot. |
-
-### Operational Transitions
-
-| From | To | Condition |
-| --- | --- | --- |
-| `Idle` | `Energized` | VCU local `contactors_closed` flag becomes true after HVSCU acknowledgement. |
-| `Energized` | `Idle` | `contactors_closed` becomes false. |
-| `Ready` | `Idle` | `contactors_closed` becomes false. |
-| `Demonstration` | `Idle` | `contactors_closed` becomes false. |
-| `Energized` | `Ready` | Brakes are not active. |
-| `Ready` | `Energized` | Brakes are active. |
-| `Ready` | `Demonstration` | Demonstration bitfield is nonzero. |
-| `Demonstration` | `Ready` | Demonstration bitfield returns to zero. |
-| `Idle` | `Recovery` | Emergency tape input is off, or a recovery order was received. |
-
-### Operational Entry and Exit Actions
-
-| State | Action |
-| --- | --- |
-| Enter `Ready` | Disable tapes in H10 naming. |
-| Exit `Ready` | Enable tapes in H10 naming. |
-| Enter `Demonstration` | Disable tapes in H10 naming. |
-| Exit `Demonstration` | Enable tapes in H10 naming. |
-| Enter `Recovery` | Enable tapes in H10 naming and set recovery status to `1`. |
-
-The H10 tape naming is confusing because the function names, pin state, and vehicle intent are tightly coupled to old wiring. Preserve the state-machine intent, but confirm active levels on H11 hardware before implementing outputs.
-
-## Demonstration Bitfield
-
-H10 uses `order_demonstration_bitfield` to know whether `Demonstration` should remain active. Each remote action sets or clears one bit:
-
-| Bit | Meaning |
-| --- | --- |
-| 0 | Levitation active. |
-| 1 | Propulsion or motor-control action active. |
-| 2 | Low-voltage charging active, declared but not implemented in checked handlers. |
-| 3 | High-voltage charging active, declared but not implemented in checked handlers. |
-| 4 | Horizontal levitation active, declared but not implemented in checked handlers. |
-| 5 | Booster active. |
-| 6 | Brake active, declared but not used in checked handlers. |
-| 7 | Contactors closed, declared but not used in checked handlers. |
-| 8 | End of run, declared but not used in checked handlers. |
+- turn on fault LED;
+- propagate fault to remote boards when connected;
+- request contactor opening;
+- brake;
+- synchronize telemetry.

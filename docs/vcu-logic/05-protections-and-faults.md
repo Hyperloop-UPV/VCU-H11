@@ -18,7 +18,7 @@ H11 should keep the same safety intent but route it through ST-LIB fault infrast
 
 | Trigger | H10 source behavior | Intended meaning |
 | --- | --- | --- |
-| Required TCP peer disconnects | `Operational -> Fault` if control station, HVSCU, or PCU TCP is disconnected. | The VCU cannot safely coordinate without required peers. |
+| Required TCP peer disconnects | `Operational -> Fault` if control station, HVBMS, or PCU TCP is disconnected. | The VCU cannot safely coordinate without required peers. |
 | Required peer never connects | `Connecting` remains active until required peers connect. | The VCU should not become operational without minimum communications. |
 | Brake reed condition | `Connecting` or `Operational -> Fault` when all monitored reeds are active after first brake sequence. | Brake/reed safety condition requiring confirmation before H11 implementation. |
 | SDC opens | `Operational -> Fault` when SDC is false. | Safety chain opened. |

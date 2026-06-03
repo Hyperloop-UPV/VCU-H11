@@ -56,7 +56,7 @@ The H10 logic treats these boards as coordinated peers:
 | Board | VCU responsibility |
 | --- | --- |
 | Control station | Receive operator orders and send VCU telemetry. |
-| HVSCU | Request contactor close/open and wait for HVSCU state acknowledgement. |
+| HVBMS | Request contactor close/open and wait for HVBMS state acknowledgement. |
 | PCU | Forward run and motor-control orders and wait for propulsion/stop state acknowledgement. |
 | LCU | Forward levitation and booster orders and wait for levitation/booster state acknowledgement. |
 | BMSL, BCU, BLCU | Referenced by legacy code, but not fully active in the inspected H10 snapshot. |
@@ -87,7 +87,7 @@ In H11, this behavior should be implemented through the ST-LIB fault, protection
 
 The VCU is not the low-level controller for every subsystem:
 
-- HVSCU owns the physical contactor actuation.
+- HVBMS owns the physical contactor actuation.
 - PCU owns propulsion and motor control.
 - LCU owns levitation and booster behavior.
 - The control station owns operator UI and command generation.

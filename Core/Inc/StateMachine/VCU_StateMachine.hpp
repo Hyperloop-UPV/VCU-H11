@@ -1,71 +1,23 @@
 #ifndef VCU_STATE_MACHINE_HPP
 #define VCU_STATE_MACHINE_HPP
 
-#ifdef STLIB_ETH
 #include "Communications/Packets/OrderPackets.hpp"
-#endif
 #include "VCU_TYPES.hpp"
 
 namespace VCU_StateMachine {
 
 namespace Detail {
 
-struct PendingRemoteOrder {
-    bool sent = false;
-    uint64_t sent_at_us = 0;
-};
-
-inline PendingRemoteOrder close_contactors_order;
-inline PendingRemoteOrder open_contactors_order;
-inline PendingRemoteOrder runs_order;
-inline PendingRemoteOrder svpwm_order;
-inline PendingRemoteOrder stop_motor_order;
-inline PendingRemoteOrder current_control_order;
-inline PendingRemoteOrder speed_control_order;
-inline PendingRemoteOrder motor_brake_order;
-inline PendingRemoteOrder levitation_order;
-inline PendingRemoteOrder stop_levitation_order;
-inline PendingRemoteOrder booster_order;
-inline PendingRemoteOrder stop_booster_order;
-inline bool booster_forwarded = false;
-
-inline bool elapsed(uint64_t start_us, uint32_t timeout_us) {
-    return Scheduler::get_global_tick() - start_us >= timeout_us;
+inline bool is_state(VCU::OperationalState state) {
+    return VCU::operational_state == state;
 }
 
-inline void mark_sent(PendingRemoteOrder& order) {
-    order.sent = true;
-    order.sent_at_us = Scheduler::get_global_tick();
+inline bool is_fault_state() {
+    return is_state(VCU::OperationalState::Fault) || FaultController::is_faulted();
 }
 
-inline void clear(PendingRemoteOrder& order) {
-    order.sent = false;
-    order.sent_at_us = 0;
-}
-
-inline bool can_start_motion_order() {
-    return VCU::operational_state == VCU::OperationalState::Ready ||
-           VCU::operational_state == VCU::OperationalState::Demonstration;
-}
-
-inline bool can_stop_motion_order() {
-    return VCU::operational_state == VCU::OperationalState::Demonstration;
-}
-
-inline void update_operational_state() {
-    if (VCU::recovery_requested && !VCU::contactors_closed) {
-        VCU::operational_state = VCU::OperationalState::Recovery;
-    } else if (!VCU::contactors_closed) {
-        VCU::operational_state = VCU::OperationalState::Idle;
-    } else if (VCU::demonstration_bitfield != 0) {
-        VCU::operational_state = VCU::OperationalState::Demonstration;
-    } else if (VCU::active_brakes) {
-        VCU::operational_state = VCU::OperationalState::Energized;
-    } else {
-        VCU::operational_state = VCU::OperationalState::Ready;
-    }
-
-    VCU::sync_state_telemetry();
+inline void open_sdc() {
+    // H11 currently exposes SDC as an input/protection, not as a controllable output.
 }
 
 inline void sample_inputs() {
@@ -95,25 +47,8 @@ inline void sample_inputs() {
     }
 }
 
-#ifdef STLIB_ETH
 inline bool socket_connected(auto* socket) {
     return socket != nullptr && socket->is_connected();
-}
-
-inline void refresh_connections() {
-    VCU::control_station_connected = socket_connected(OrderPackets::control_station_tcp);
-    VCU::hvscu_connected = socket_connected(OrderPackets::hvscu_tcp);
-    VCU::pcu_connected = socket_connected(OrderPackets::pcu_tcp);
-    VCU::required_peers_connected =
-        VCU::control_station_connected && VCU::hvscu_connected && VCU::pcu_connected;
-
-    if (VCU::required_peers_connected) {
-        VCU::required_peers_were_connected = true;
-    } else if (VCU::required_peers_were_connected && !FaultController::is_faulted()) {
-        FAULT("Required VCU communication peer disconnected");
-    }
-
-    VCU::sync_state_telemetry();
 }
 
 inline bool send_remote_order(auto* socket, HeapOrder* order, const char* description) {
@@ -132,312 +67,378 @@ inline bool send_remote_order(auto* socket, HeapOrder* order, const char* descri
     return true;
 }
 
+inline void request_open_contactors() {
+    if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected() &&
+        OrderPackets::Remote_open_contactors_order != nullptr) {
+        OrderPackets::hvbms_tcp->send_order(*OrderPackets::Remote_open_contactors_order);
+    }
+    VCU::contactors_closed = false;
+}
+
+inline void request_precharge() {
+    send_remote_order(
+        OrderPackets::hvbms_tcp,
+        OrderPackets::Remote_precharge_order,
+        "precharge"
+    );
+}
+
+inline void stop_propulsion() {
+    send_remote_order(
+        OrderPackets::pcu_tcp,
+        OrderPackets::Remote_stop_motor_order,
+        "stop propulsion"
+    );
+}
+
+inline void stop_levitation() {
+    send_remote_order(
+        OrderPackets::lcu_tcp,
+        OrderPackets::Remote_stop_levitation_order,
+        "stop levitation"
+    );
+}
+
+inline void start_propulsion() {
+    send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Remote_runs_order, "propulsion");
+}
+
+inline void start_static_levitation() {
+    send_remote_order(
+        OrderPackets::lcu_tcp,
+        OrderPackets::Remote_levitation_order,
+        "static levitation"
+    );
+}
+
+inline void start_dynamic_levitation() {
+    start_static_levitation();
+    start_propulsion();
+}
+
+inline void propagate_fault() {
+    if (OrderPackets::pcu_tcp != nullptr && OrderPackets::pcu_tcp->is_connected()) {
+        OrderPackets::pcu_tcp->send_order(*OrderPackets::FAULT_order);
+    }
+    if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected()) {
+        OrderPackets::hvbms_tcp->send_order(*OrderPackets::FAULT_order);
+    }
+    if (OrderPackets::lcu_tcp != nullptr && OrderPackets::lcu_tcp->is_connected()) {
+        OrderPackets::lcu_tcp->send_order(*OrderPackets::FAULT_order);
+    }
+}
+
+inline void refresh_connections() {
+    VCU::control_station_connected = socket_connected(OrderPackets::control_station_tcp);
+    VCU::hvbms_connected = socket_connected(OrderPackets::hvbms_tcp);
+    VCU::pcu_connected = socket_connected(OrderPackets::pcu_tcp);
+    VCU::lcu_connected = socket_connected(OrderPackets::lcu_tcp);
+    VCU::required_peers_connected = VCU::control_station_connected && VCU::hvbms_connected &&
+                                    VCU::pcu_connected && VCU::lcu_connected;
+
+    if (VCU::required_peers_connected) {
+        VCU::required_peers_were_connected = true;
+    }
+    VCU::sync_state_telemetry();
+}
+
+inline void exit_state(VCU::OperationalState state) {
+    switch (state) {
+    case VCU::OperationalState::Propulsion:
+        stop_propulsion();
+        break;
+    case VCU::OperationalState::StaticLevitation:
+        stop_levitation();
+        break;
+    case VCU::OperationalState::DynamicLevitation:
+        stop_propulsion();
+        stop_levitation();
+        break;
+    default:
+        break;
+    }
+}
+
+inline void enter_state(VCU::OperationalState state) {
+    switch (state) {
+    case VCU::OperationalState::Idle:
+        VCU::engage_brake();
+        request_open_contactors();
+        break;
+    case VCU::OperationalState::Connected:
+        VCU::engage_brake();
+        request_open_contactors();
+        break;
+    case VCU::OperationalState::Manteinance:
+        VCU::release_brake();
+        break;
+    case VCU::OperationalState::Precharging:
+        request_precharge();
+        break;
+    case VCU::OperationalState::HVActive:
+        break;
+    case VCU::OperationalState::Ready:
+        VCU::release_brake();
+        break;
+    case VCU::OperationalState::Propulsion:
+        start_propulsion();
+        break;
+    case VCU::OperationalState::StaticLevitation:
+        start_static_levitation();
+        break;
+    case VCU::OperationalState::DynamicLevitation:
+        start_dynamic_levitation();
+        break;
+    case VCU::OperationalState::Fault:
+        open_sdc();
+        if (VCU::led_fault != nullptr) {
+            VCU::led_fault->turn_on();
+        }
+        propagate_fault();
+        request_open_contactors();
+        VCU::engage_brake();
+        break;
+    }
+    VCU::sync_state_telemetry();
+}
+
+inline void transition_to(VCU::OperationalState next_state) {
+    if (VCU::operational_state == next_state) {
+        return;
+    }
+
+    const auto previous_state = VCU::operational_state;
+    exit_state(previous_state);
+    VCU::operational_state = next_state;
+    enter_state(next_state);
+}
+
+inline void transition_to_fault(const char* reason) {
+    if (!is_state(VCU::OperationalState::Fault)) {
+        exit_state(VCU::operational_state);
+        VCU::operational_state = VCU::OperationalState::Fault;
+        enter_state(VCU::OperationalState::Fault);
+    }
+    if (!FaultController::is_faulted()) {
+        FAULT("%s", reason);
+    }
+}
+
 inline void reject_order(bool& flag, const char* message) {
     WARNING("%s", message);
     flag = false;
 }
 
+inline void check_fault_inputs() {
+    if (is_fault_state()) {
+        return;
+    }
+
+    if (VCU::brake_fault_detected) {
+        transition_to_fault("Brake fault detected");
+        return;
+    }
+
+    if (!VCU::sdc_closed) {
+        transition_to_fault("SDC is open");
+        return;
+    }
+
+    if (VCU::required_peers_were_connected && !VCU::control_station_connected &&
+        !is_state(VCU::OperationalState::Idle)) {
+        transition_to_fault("Control station disconnected");
+    }
+}
+
+inline void handle_connection_transition() {
+    if (is_state(VCU::OperationalState::Idle) && VCU::required_peers_connected) {
+        transition_to(VCU::OperationalState::Connected);
+    }
+}
+
 inline void handle_fault_orders() {
     if (OrderPackets::FAULT_flag) {
         OrderPackets::FAULT_flag = false;
-        FAULT("FAULT order received");
+        transition_to_fault("FAULT order received");
     }
 
     if (OrderPackets::Emergency_stop_flag) {
         OrderPackets::Emergency_stop_flag = false;
-        FAULT("Emergency stop order received");
+        transition_to_fault("Emergency stop order received");
     }
 }
 
-inline void handle_local_orders() {
-    if (OrderPackets::Recovery_flag) {
-        VCU::recovery_requested = true;
-        VCU::recovery_status = 1;
-        OrderPackets::Recovery_flag = false;
-    }
-
+inline void handle_common_orders() {
     if (OrderPackets::Cooling_pump_power_flag) {
         const auto selection = static_cast<VCU::PumpSelection>(VCU::cooling_pump_selection);
         VCU::set_cooling_pump(selection, VCU::cooling_pump_duty);
         OrderPackets::Cooling_pump_power_flag = false;
     }
 
-    if (OrderPackets::Brake_flag) {
-        if (VCU::operational_state != VCU::OperationalState::Ready &&
-            VCU::operational_state != VCU::OperationalState::Demonstration) {
-            reject_order(OrderPackets::Brake_flag, "Cannot brake in this operational state");
-        } else {
-            VCU::engage_brake();
-            OrderPackets::Brake_flag = false;
+    if (OrderPackets::Stop_flag) {
+        OrderPackets::Stop_flag = false;
+        switch (VCU::operational_state) {
+        case VCU::OperationalState::Manteinance:
+        case VCU::OperationalState::Precharging:
+        case VCU::OperationalState::HVActive:
+        case VCU::OperationalState::Ready:
+        case VCU::OperationalState::Propulsion:
+        case VCU::OperationalState::StaticLevitation:
+        case VCU::OperationalState::DynamicLevitation:
+            transition_to(VCU::OperationalState::Connected);
+            break;
+        default:
+            break;
         }
+        return;
+    }
+}
+
+inline void handle_connected_orders() {
+    if (!is_state(VCU::OperationalState::Connected)) {
+        return;
+    }
+
+    if (OrderPackets::MANTEINANCE_flag) {
+        OrderPackets::MANTEINANCE_flag = false;
+        transition_to(VCU::OperationalState::Manteinance);
+        return;
+    }
+
+    if (OrderPackets::Precharge_flag) {
+        OrderPackets::Precharge_flag = false;
+        transition_to(VCU::OperationalState::Precharging);
+        return;
+    }
+}
+
+inline void handle_precharging() {
+    if (!is_state(VCU::OperationalState::Precharging)) {
+        return;
+    }
+
+    if (VCU::hvbms_state == static_cast<uint8_t>(VCU::HVBMSState::Closed)) {
+        VCU::contactors_closed = true;
+        transition_to(VCU::OperationalState::HVActive);
+        return;
+    }
+}
+
+inline void handle_hv_active_orders() {
+    if (!is_state(VCU::OperationalState::HVActive)) {
+        return;
     }
 
     if (OrderPackets::Unbrake_flag) {
-        if (VCU::operational_state != VCU::OperationalState::Energized &&
-            VCU::operational_state != VCU::OperationalState::Recovery) {
-            reject_order(OrderPackets::Unbrake_flag, "Cannot unbrake in this operational state");
-        } else {
-            Scheduler::set_timeout(2'000'000, +[]() { VCU::release_brake(); });
-            OrderPackets::Unbrake_flag = false;
-        }
+        OrderPackets::Unbrake_flag = false;
+        transition_to(VCU::OperationalState::Ready);
+        return;
     }
 }
 
-inline void handle_contactor_orders() {
-    if (OrderPackets::Close_contactors_flag) {
-        if (VCU::operational_state != VCU::OperationalState::Idle) {
-            reject_order(
-                OrderPackets::Close_contactors_flag,
-                "Cannot close contactors outside Idle"
-            );
-            clear(close_contactors_order);
-        } else if (!close_contactors_order.sent) {
-            if (send_remote_order(
-                    OrderPackets::hvscu_tcp,
-                    OrderPackets::Remote_close_contactors_order,
-                    "close contactors"
-                )) {
-                mark_sent(close_contactors_order);
-            } else {
-                OrderPackets::Close_contactors_flag = false;
-                clear(close_contactors_order);
-            }
-        } else if (VCU::hvscu_state == static_cast<uint8_t>(VCU::HVSCUState::Closed)) {
-            VCU::contactors_closed = true;
-            OrderPackets::Close_contactors_flag = false;
-            clear(close_contactors_order);
-        } else if (elapsed(close_contactors_order.sent_at_us, VCU::contactor_ack_timeout_us)) {
-            OrderPackets::Close_contactors_flag = false;
-            clear(close_contactors_order);
-            FAULT("HVSCU did not acknowledge closed contactors");
-        }
+inline void handle_ready_orders() {
+    if (!is_state(VCU::OperationalState::Ready)) {
+        return;
     }
 
-    if (OrderPackets::Open_contactors_flag) {
-        if (!open_contactors_order.sent) {
-            if (send_remote_order(
-                    OrderPackets::hvscu_tcp,
-                    OrderPackets::Remote_open_contactors_order,
-                    "open contactors"
-                )) {
-                mark_sent(open_contactors_order);
-            } else {
-                OrderPackets::Open_contactors_flag = false;
-                clear(open_contactors_order);
-            }
-        } else if (VCU::hvscu_state == static_cast<uint8_t>(VCU::HVSCUState::Opened)) {
-            VCU::contactors_closed = false;
-            VCU::engage_brake();
-            OrderPackets::Open_contactors_flag = false;
-            clear(open_contactors_order);
-        } else if (elapsed(open_contactors_order.sent_at_us, VCU::remote_ack_timeout_us)) {
-            OrderPackets::Open_contactors_flag = false;
-            clear(open_contactors_order);
-            FAULT("HVSCU did not acknowledge opened contactors");
-        }
+    if (OrderPackets::Brake_flag) {
+        OrderPackets::Brake_flag = false;
+        VCU::engage_brake();
+        transition_to(VCU::OperationalState::HVActive);
+        return;
+    }
+
+    if (OrderPackets::Propulsion_flag) {
+        OrderPackets::Propulsion_flag = false;
+        transition_to(VCU::OperationalState::Propulsion);
+        return;
+    }
+
+    if (OrderPackets::Static_levitation_flag) {
+        OrderPackets::Static_levitation_flag = false;
+        transition_to(VCU::OperationalState::StaticLevitation);
+        return;
+    }
+
+    if (OrderPackets::Dynamic_levitation_flag) {
+        OrderPackets::Dynamic_levitation_flag = false;
+        transition_to(VCU::OperationalState::DynamicLevitation);
+        return;
     }
 }
 
-inline void handle_start_remote_order(
-    bool& flag,
-    PendingRemoteOrder& pending_order,
-    auto* socket,
-    HeapOrder* remote_order,
-    uint8_t& reported_state,
-    uint8_t expected_state,
-    uint8_t demonstration_bit,
-    const char* description
-) {
-    if (!flag) {
+inline void handle_static_levitation_orders() {
+    if (!is_state(VCU::OperationalState::StaticLevitation)) {
         return;
     }
-    if (!can_start_motion_order()) {
-        reject_order(flag, "Cannot start remote motion order in this operational state");
-        clear(pending_order);
+
+    if (OrderPackets::Dynamic_levitation_flag) {
+        OrderPackets::Dynamic_levitation_flag = false;
+        transition_to(VCU::OperationalState::DynamicLevitation);
         return;
-    }
-    if (!pending_order.sent) {
-        if (send_remote_order(socket, remote_order, description)) {
-            mark_sent(pending_order);
-        } else {
-            flag = false;
-            clear(pending_order);
-        }
-        return;
-    }
-    if (reported_state == expected_state) {
-        VCU::demonstration_bitfield |= (1UL << demonstration_bit);
-        flag = false;
-        clear(pending_order);
-        return;
-    }
-    if (elapsed(pending_order.sent_at_us, VCU::remote_ack_timeout_us)) {
-        flag = false;
-        clear(pending_order);
-        FAULT("Remote order acknowledgement timeout: %s", description);
     }
 }
 
-inline void handle_stop_remote_order(
-    bool& flag,
-    PendingRemoteOrder& pending_order,
-    auto* socket,
-    HeapOrder* remote_order,
-    uint8_t& reported_state,
-    uint8_t expected_state,
-    uint8_t demonstration_bit,
-    const char* description
-) {
-    if (!flag) {
+inline void handle_propulsion_orders() {
+    if (!is_state(VCU::OperationalState::Propulsion) &&
+        !is_state(VCU::OperationalState::DynamicLevitation)) {
         return;
     }
-    if (!can_stop_motion_order()) {
-        reject_order(flag, "Cannot stop remote motion order outside Demonstration");
-        clear(pending_order);
-        return;
+
+    if (OrderPackets::Runs_flag) {
+        OrderPackets::Runs_flag = false;
+        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Remote_runs_order, "runs");
     }
-    if (!pending_order.sent) {
-        if (send_remote_order(socket, remote_order, description)) {
-            mark_sent(pending_order);
-        } else {
-            flag = false;
-            clear(pending_order);
-        }
-        return;
+    if (OrderPackets::SVPWM_flag) {
+        OrderPackets::SVPWM_flag = false;
+        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Remote_SVPWM_order, "SVPWM");
     }
-    if (reported_state == expected_state) {
-        VCU::demonstration_bitfield &= ~(1UL << demonstration_bit);
-        flag = false;
-        clear(pending_order);
-        return;
+    if (OrderPackets::Current_control_flag) {
+        OrderPackets::Current_control_flag = false;
+        send_remote_order(
+            OrderPackets::pcu_tcp,
+            OrderPackets::Remote_current_control_order,
+            "current control"
+        );
     }
-    if (elapsed(pending_order.sent_at_us, VCU::remote_ack_timeout_us)) {
-        flag = false;
-        clear(pending_order);
-        FAULT("Remote order acknowledgement timeout: %s", description);
+    if (OrderPackets::Speed_control_flag) {
+        OrderPackets::Speed_control_flag = false;
+        send_remote_order(
+            OrderPackets::pcu_tcp,
+            OrderPackets::Remote_speed_control_order,
+            "speed control"
+        );
+    }
+    if (OrderPackets::Motor_brake_flag) {
+        OrderPackets::Motor_brake_flag = false;
+        send_remote_order(
+            OrderPackets::pcu_tcp,
+            OrderPackets::Remote_motor_brake_order,
+            "motor brake"
+        );
     }
 }
 
-inline void handle_pcu_orders() {
-    handle_start_remote_order(
-        OrderPackets::Runs_flag,
-        runs_order,
-        OrderPackets::pcu_tcp,
-        OrderPackets::Remote_runs_order,
-        VCU::pcu_state,
-        static_cast<uint8_t>(VCU::PCUState::Propulsion),
-        VCU::propulsion_bit,
-        "runs"
-    );
-    handle_start_remote_order(
-        OrderPackets::SVPWM_flag,
-        svpwm_order,
-        OrderPackets::pcu_tcp,
-        OrderPackets::Remote_SVPWM_order,
-        VCU::pcu_state,
-        static_cast<uint8_t>(VCU::PCUState::Propulsion),
-        VCU::propulsion_bit,
-        "SVPWM"
-    );
-    handle_start_remote_order(
-        OrderPackets::Current_control_flag,
-        current_control_order,
-        OrderPackets::pcu_tcp,
-        OrderPackets::Remote_current_control_order,
-        VCU::pcu_state,
-        static_cast<uint8_t>(VCU::PCUState::Propulsion),
-        VCU::propulsion_bit,
-        "current control"
-    );
-    handle_start_remote_order(
-        OrderPackets::Speed_control_flag,
-        speed_control_order,
-        OrderPackets::pcu_tcp,
-        OrderPackets::Remote_speed_control_order,
-        VCU::pcu_state,
-        static_cast<uint8_t>(VCU::PCUState::Propulsion),
-        VCU::propulsion_bit,
-        "speed control"
-    );
-    handle_start_remote_order(
-        OrderPackets::Motor_brake_flag,
-        motor_brake_order,
-        OrderPackets::pcu_tcp,
-        OrderPackets::Remote_motor_brake_order,
-        VCU::pcu_state,
-        static_cast<uint8_t>(VCU::PCUState::Propulsion),
-        VCU::propulsion_bit,
-        "motor brake"
-    );
-    handle_stop_remote_order(
-        OrderPackets::Stop_motor_flag,
-        stop_motor_order,
-        OrderPackets::pcu_tcp,
-        OrderPackets::Remote_stop_motor_order,
-        VCU::pcu_state,
-        static_cast<uint8_t>(VCU::PCUState::Stopped),
-        VCU::propulsion_bit,
-        "stop motor"
-    );
-}
-
-inline void handle_lcu_orders() {
-    handle_start_remote_order(
-        OrderPackets::Levitation_flag,
-        levitation_order,
-        OrderPackets::lcu_tcp,
-        OrderPackets::Remote_levitation_order,
-        VCU::lcu_vertical_state,
-        static_cast<uint8_t>(VCU::LCUState::Levitation),
-        VCU::levitation_bit,
-        "levitation"
-    );
-    handle_stop_remote_order(
-        OrderPackets::Stop_levitation_flag,
-        stop_levitation_order,
-        OrderPackets::lcu_tcp,
-        OrderPackets::Remote_stop_levitation_order,
-        VCU::lcu_vertical_state,
-        static_cast<uint8_t>(VCU::LCUState::Stopped),
-        VCU::levitation_bit,
-        "stop levitation"
-    );
-    handle_start_remote_order(
-        OrderPackets::Booster_flag,
-        booster_order,
-        OrderPackets::lcu_tcp,
-        OrderPackets::Remote_booster_order,
-        VCU::lcu_horizontal_state,
-        static_cast<uint8_t>(VCU::BoosterState::Enabled),
-        VCU::booster_bit,
-        "booster"
-    );
-    if (!OrderPackets::Booster_flag &&
-        !booster_forwarded &&
-        ((VCU::demonstration_bitfield & (1UL << VCU::booster_bit)) != 0) &&
-        VCU::lcu_horizontal_state == static_cast<uint8_t>(VCU::BoosterState::Enabled) &&
-        OrderPackets::bcu_tcp != nullptr && OrderPackets::bcu_tcp->is_connected()) {
-        OrderPackets::bcu_tcp->send_order(*OrderPackets::Forward_booster_order);
-        booster_forwarded = true;
+inline void handle_levitation_orders() {
+    if (!is_state(VCU::OperationalState::StaticLevitation) &&
+        !is_state(VCU::OperationalState::DynamicLevitation)) {
+        return;
     }
-    handle_stop_remote_order(
-        OrderPackets::Stop_booster_flag,
-        stop_booster_order,
-        OrderPackets::lcu_tcp,
-        OrderPackets::Remote_stop_booster_order,
-        VCU::lcu_horizontal_state,
-        static_cast<uint8_t>(VCU::BoosterState::Disabled),
-        VCU::booster_bit,
-        "stop booster"
-    );
-    if (VCU::lcu_horizontal_state == static_cast<uint8_t>(VCU::BoosterState::Disabled)) {
-        booster_forwarded = false;
+
+    if (OrderPackets::Levitation_flag) {
+        OrderPackets::Levitation_flag = false;
+        send_remote_order(
+            OrderPackets::lcu_tcp,
+            OrderPackets::Remote_levitation_order,
+            "levitation"
+        );
     }
 }
 
 inline void clear_remote_callback_flags() {
     OrderPackets::Remote_close_contactors_flag = false;
     OrderPackets::Remote_open_contactors_flag = false;
+    OrderPackets::Remote_precharge_flag = false;
     OrderPackets::Remote_runs_flag = false;
     OrderPackets::Remote_SVPWM_flag = false;
     OrderPackets::Remote_stop_motor_flag = false;
@@ -453,26 +454,19 @@ inline void clear_remote_callback_flags() {
 
 inline void handle_orders() {
     handle_fault_orders();
-    handle_local_orders();
-    handle_contactor_orders();
-    handle_pcu_orders();
-    handle_lcu_orders();
+    handle_common_orders();
+    handle_connected_orders();
+    handle_precharging();
+    handle_hv_active_orders();
+    handle_ready_orders();
+    handle_static_levitation_orders();
+    handle_propulsion_orders();
+    handle_levitation_orders();
     clear_remote_callback_flags();
 }
-#else
-inline void refresh_connections() {
-    VCU::control_station_connected = false;
-    VCU::hvscu_connected = false;
-    VCU::pcu_connected = false;
-    VCU::required_peers_connected = false;
-    VCU::sync_state_telemetry();
-}
-
-inline void handle_orders() {}
-#endif
 
 inline void update_status_leds() {
-    if (FaultController::is_faulted()) {
+    if (is_fault_state()) {
         if (VCU::led_connecting != nullptr) {
             VCU::led_connecting->turn_off();
         }
@@ -501,7 +495,7 @@ inline void update_status_leds() {
 
 inline void start() {
     VCU::operational_state = VCU::OperationalState::Idle;
-    VCU::sync_state_telemetry();
+    Detail::enter_state(VCU::OperationalState::Idle);
     Detail::sample_inputs();
     Detail::refresh_connections();
     Scheduler::register_task(100'000, +[]() { Detail::sample_inputs(); });
@@ -511,9 +505,12 @@ inline void start() {
 inline void update() {
     Detail::sample_inputs();
     Detail::refresh_connections();
-    Detail::update_operational_state();
+    Detail::check_fault_inputs();
+    if (Detail::is_fault_state()) {
+        return;
+    }
+    Detail::handle_connection_transition();
     Detail::handle_orders();
-    Detail::update_operational_state();
 }
 
 } // namespace VCU_StateMachine

@@ -1,10 +1,8 @@
 #ifndef VCU_HPP
 #define VCU_HPP
 
-#ifdef STLIB_ETH
 #include "Communications/Packets/DataPackets.hpp"
 #include "Communications/Packets/OrderPackets.hpp"
-#endif
 #include "ST-LIB.hpp"
 #include "StateMachine/VCU_StateMachine.hpp"
 #include "VCU_TYPES.hpp"
@@ -13,9 +11,7 @@ namespace VCU {
 
 using Board = ST_LIB::Board<
     ST_LIB::FaultPolicyNoMachine<on_fault_enter>,
-#ifdef STLIB_ETH
     eth,
-#endif
     led_operational_req,
     led_sleep_req,
     led_can_req,
@@ -42,9 +38,7 @@ using Board = ST_LIB::Board<
 inline void init() {
     Board::init();
 
-#ifdef STLIB_ETH
     ethernet = &Board::instance_of<eth>();
-#endif
 
     led_operational = &Board::instance_of<led_operational_req>();
     led_sleep = &Board::instance_of<led_sleep_req>();
@@ -94,7 +88,6 @@ inline void init() {
     led_connecting->turn_off();
     led_fault->turn_off();
 
-#ifdef STLIB_ETH
     DataPackets::VCU_State_init(
         general_state,
         operational_state_id,
@@ -114,15 +107,16 @@ inline void init() {
         sdc_closed,
         contactors_closed,
         control_station_connected,
-        hvscu_connected,
+        hvbms_connected,
         pcu_connected,
+        lcu_connected,
         required_peers_connected
     );
-    DataPackets::HVSCU_State_init(hvscu_state);
+    DataPackets::HVBMS_State_init(hvbms_state);
     DataPackets::LCU_State_init(lcu_vertical_state, lcu_horizontal_state);
     DataPackets::PCU_State_init(pcu_state);
     DataPackets::Remote_States_init(
-        hvscu_state,
+        hvbms_state,
         pcu_state,
         lcu_vertical_state,
         lcu_horizontal_state
@@ -132,6 +126,12 @@ inline void init() {
     OrderPackets::FAULT_init();
     OrderPackets::Recovery_init();
     OrderPackets::Cooling_pump_power_init(cooling_pump_duty, cooling_pump_selection);
+    OrderPackets::MANTEINANCE_init();
+    OrderPackets::Precharge_init();
+    OrderPackets::Stop_init();
+    OrderPackets::Propulsion_init();
+    OrderPackets::Static_levitation_init();
+    OrderPackets::Dynamic_levitation_init();
     OrderPackets::Brake_init();
     OrderPackets::Close_contactors_init();
     OrderPackets::Unbrake_init();
@@ -166,6 +166,7 @@ inline void init() {
     OrderPackets::Stop_booster_init();
     OrderPackets::Remote_close_contactors_init();
     OrderPackets::Remote_open_contactors_init();
+    OrderPackets::Remote_precharge_init();
     OrderPackets::Remote_runs_init(run_id);
     OrderPackets::Remote_SVPWM_init(
         modulation_frequency_1,
@@ -197,15 +198,12 @@ inline void init() {
 
     OrderPackets::start();
     DataPackets::start();
-#endif
 
     VCU_StateMachine::start();
 }
 
 inline void update() {
-#ifdef STLIB_ETH
     ethernet->update();
-#endif
     VCU_StateMachine::update();
     FaultController::check_transitions();
     Board::evaluate_protections();

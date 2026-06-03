@@ -6,9 +6,12 @@
 
 #include <cstdint>
 
+#ifndef STLIB_ETH
+#error "VCU-H11 requires Ethernet. Build with an Ethernet preset and STLIB_ETH enabled."
+#endif
+
 namespace VCU {
 
-#ifdef STLIB_ETH
 #if defined(USE_PHY_LAN8742)
 inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     ST_LIB::EthernetDomain::PINSET_H10,
@@ -33,11 +36,8 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
 #else
 #error "No PHY selected for Ethernet pinset selection"
 #endif
-#endif
 
-#ifdef STLIB_ETH
 inline ST_LIB::EthernetDomain::Instance* ethernet = nullptr;
-#endif
 
 inline constexpr auto led_operational_req =
     ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::led_operational);
@@ -153,11 +153,15 @@ enum class GeneralState : uint8_t {
 
 enum class OperationalState : uint8_t {
     Idle = 0,
-    EndOfRun = 1,
-    Energized = 2,
-    Ready = 3,
-    Demonstration = 4,
-    Recovery = 5,
+    Connected = 1,
+    Manteinance = 2,
+    Precharging = 3,
+    HVActive = 4,
+    Ready = 5,
+    Propulsion = 6,
+    StaticLevitation = 7,
+    DynamicLevitation = 8,
+    Fault = 9,
 };
 
 enum class PumpSelection : uint8_t {
@@ -165,7 +169,7 @@ enum class PumpSelection : uint8_t {
     CoolingPump2 = 1,
 };
 
-enum class HVSCUState : uint8_t {
+enum class HVBMSState : uint8_t {
     Opened = 0,
     Closed = 2,
 };
@@ -236,8 +240,9 @@ inline bool active_brakes = true;
 inline bool recovery_requested = false;
 inline bool electrovalve_enabled = false;
 inline bool control_station_connected = false;
-inline bool hvscu_connected = false;
+inline bool hvbms_connected = false;
 inline bool pcu_connected = false;
+inline bool lcu_connected = false;
 inline bool required_peers_connected = false;
 inline bool required_peers_were_connected = false;
 
@@ -246,7 +251,7 @@ inline uint8_t cooling_pump_selection = static_cast<uint8_t>(PumpSelection::Cool
 inline uint8_t cooling_pump_1_command = 0;
 inline uint8_t cooling_pump_2_command = 0;
 
-inline uint8_t hvscu_state = static_cast<uint8_t>(HVSCUState::Opened);
+inline uint8_t hvbms_state = static_cast<uint8_t>(HVBMSState::Opened);
 inline uint8_t pcu_state = static_cast<uint8_t>(PCUState::Stopped);
 inline uint8_t lcu_vertical_state = static_cast<uint8_t>(LCUState::Stopped);
 inline uint8_t lcu_horizontal_state = static_cast<uint8_t>(BoosterState::Disabled);
@@ -389,6 +394,7 @@ template <ST_LIB::TimerChannel Channel> inline uint32_t read_flow_capture_freque
 }
 
 inline void on_fault_enter() {
+    operational_state = OperationalState::Fault;
     if (led_operational != nullptr) {
         led_operational->turn_off();
     }
@@ -410,6 +416,7 @@ inline void on_fault_enter() {
     electrovalve_enabled = false;
     cooling_pump_1_command = 0;
     cooling_pump_2_command = 0;
+    contactors_closed = false;
     engage_brake();
     sync_state_telemetry();
 }

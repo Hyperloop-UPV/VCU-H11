@@ -1,0 +1,42 @@
+States: [IDLE, CONNECTED, MANTEINANCE, PRECHARGING, HV_ACTIVE, READY, PROPULSION, STATIC_LEVITATION, DYNAMIC_LEVITATION, FAULT]
+Initial state: IDLE
+Transitions:
+  IDLE: 
+    CONNECTED: when we are connected to the control station and to all the boards we need to connect
+  CONNECTED: 
+    MANTEINANCE: when an specific order arrives: MANTEINANCE
+    PRECHARGING: when an specific order arrives: PRECHARGE
+  MANTEINANCE:
+    CONNECTED: when an specific order arrives: STOP
+  PRECHARGING:
+    CONNECTED: when an specific order arrives: STOP
+    HV_ACTIVE: when the precharge finalize. This is sent by the HVBMS
+  HV_ACTIVE:
+    CONNECTED: when an specific order arrives: STOP
+    READY: when a specific order arrives: UNBRAKE
+  READY:
+    CONNECTED: when an specific order arrives: STOP
+    HV_ACTIVE: when an specific order arrives: BRAKE
+    PROPULSION: when an specific order arrives: PROPULSION
+    STATIC_LEVITATION: when an specific order arrives: STATIC_LEVITATION
+    DYNAMIC_LEVITATION: when an specific order arrives: DYNAMIC_LEVITATION
+  STATIC_LEVITATION: 
+    DYNAMIC_LEVITATION: when an specific order arrives: DYNAMIC_LEVITATION
+  *:
+    FAULT: when any protection gets triggered, or we got disconnected from the control station
+Actions:
+  Enter:
+    IDLE: brake, open contactors, and wait to be connected to the control station and to all the boards we need to connect
+    CONNECTED: brake, open contactors, and wait for the order MANTEINANCE or PRECHARGE
+    MANTEINANCE: unbrake, and wait for the order STOP
+    PRECHARGING: send to the HVBMS to start the precharge, and wait for the order STOP
+    HV_ACTIVE: wait for the order UNBRAKE or STOP
+    READY: unbrake, and wait for the order BRAKE, STOP, PROPULSION, STATIC_LEVITATION or DYNAMIC_LEVITATION
+    PROPULSION: wait for the specific propulsion orders
+    STATIC_LEVITATION: wait for the specific static levitation orders, or to start dynamic levitation
+    DYNAMIC_LEVITATION: wait for the specific dynamic leviation orders
+    FAULT: open sdc, turn on FAULT led, propagate FAULT, open contactors
+  Exit:
+    PROPULSION: stop propelling
+    STATIC_LEVITATION: stop levitating
+    DYNAMIC_LEVITATION: stop propelling and levitating
