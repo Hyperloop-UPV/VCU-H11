@@ -173,6 +173,21 @@ Known passing checks:
 - `./hyper build main --preset board-debug-eth-lan8700 --board-name VCU`
 - `python3 -m py_compile hyper`
 
+When modifying ADJ files under `Core/Inc/Code_generation/JSON_ADE`, run the ADJ validator before handoff. The validator depends on `jsonschema`; install the pinned tester requirements into the repository virtual environment when needed:
+
+```bash
+.venv/bin/python -m pip install -r Core/Inc/Code_generation/JSON_ADE/.github/workflows/scripts/adj-tester/requirements.txt
+```
+
+Run the validator from the ADJ root with the repository virtual environment:
+
+```bash
+cd Core/Inc/Code_generation/JSON_ADE
+../../../../.venv/bin/python .github/workflows/scripts/adj-tester/main.py
+```
+
+The validator checks schema validity and project consistency such as unused measurements. If ADJ packets or orders are removed for a test branch, trim `VCU_measurements.json` to match the remaining packet/order variables or the validator will fail.
+
 Do not restore `Core/Src/Runes/generated_metadata.cpp` after builds. The user explicitly requested that generated metadata stay as generated.
 
 ## Altium And Hardware Inputs
@@ -209,6 +224,7 @@ Update this file when a durable fact becomes known. Good updates include:
 - Confirmed VCU operational states and transitions.
 - Protection and diagnostic policies.
 - Build, flash, debug, or hardware validation workflows that were actually run.
+- ADJ validation workflows, especially if the command or required environment changes.
 - User preferences that affect future work.
 
 Do not add transient command output, speculative assumptions, or one-off debugging notes. If a fact is inferred rather than confirmed, label it as inferred and keep it in `Open Decisions` until confirmed.
