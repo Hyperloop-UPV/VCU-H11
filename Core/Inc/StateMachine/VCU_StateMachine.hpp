@@ -47,6 +47,18 @@ inline void sample_inputs() {
     }
 }
 
+inline void check_pressure_warning() {
+    if (VCU::high_pressure < VCU::high_pressure_warning_threshold_bar) {
+        if (!VCU::high_pressure_warning_active) {
+            WARNING("High pressure below 50 bar");
+            VCU::high_pressure_warning_active = true;
+        }
+        return;
+    }
+
+    VCU::high_pressure_warning_active = false;
+}
+
 inline bool socket_connected(auto* socket) {
     return socket != nullptr && socket->is_connected();
 }
@@ -236,6 +248,11 @@ inline void check_fault_inputs() {
 
     if (VCU::brake_fault_detected) {
         transition_to_fault("Brake fault detected");
+        return;
+    }
+
+    if (VCU::tapes_reached) {
+        transition_to_fault("Tapes reached");
         return;
     }
 
@@ -504,6 +521,7 @@ inline void start() {
 
 inline void update() {
     Detail::sample_inputs();
+    Detail::check_pressure_warning();
     Detail::refresh_connections();
     Detail::check_fault_inputs();
     if (Detail::is_fault_state()) {

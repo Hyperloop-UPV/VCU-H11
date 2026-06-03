@@ -71,6 +71,18 @@ context:
       access: read
       initial_value: false
 
+    - name: tapes_reached
+      type: bool
+      access: read
+      initial_value: false
+      description: Formal tape/end-of-track signal. Current H11 pin source is not defined yet.
+
+    - name: high_pressure
+      type: float
+      unit: bar
+      access: read
+      initial_value: 0.0
+
     - name: contactors_closed
       type: bool
       access: read_write
@@ -86,6 +98,12 @@ context:
       access: read
       initial_value: 0
       description: Existing high-voltage board state packet; Closed is currently used as precharge complete.
+
+constants:
+  - name: MIN_HIGH_PRESSURE_WARNING_BAR
+    type: float
+    value: 50.0
+    unit: bar
 
 states:
   - name: IDLE
@@ -210,6 +228,10 @@ events:
     source: control_station
     description: Low-level levitation command accepted only in STATIC_LEVITATION or DYNAMIC_LEVITATION.
 
+  - name: HIGH_PRESSURE_LOW
+    source: diagnostics
+    description: High pressure is below 50 bar and should emit a warning.
+
   - name: PROTECTION_TRIGGERED
     source: protection
 
@@ -229,10 +251,16 @@ guards:
     description: Temporary implementation guard for HVBMS precharge completion.
 
   - name: protection_active
-    expression: sdc_closed == false || brake_fault_detected == true
+    expression: sdc_closed == false || brake_fault_detected == true || tapes_reached == true
     dependencies:
       - sdc_closed
       - brake_fault_detected
+      - tapes_reached
+
+  - name: high_pressure_below_warning_threshold
+    expression: high_pressure < MIN_HIGH_PRESSURE_WARNING_BAR
+    dependencies:
+      - high_pressure
 
   - name: control_station_lost
     expression: control_station_connected == false
@@ -291,6 +319,9 @@ actions:
 
   - name: forward_static_levitation_order
     function: action_forward_static_levitation_order
+
+  - name: emit_low_pressure_warning
+    function: action_emit_low_pressure_warning
 
   - name: log_unhandled_event
     function: action_log_unhandled_event
@@ -421,6 +452,16 @@ transitions:
     actions:
       - forward_static_levitation_order
     priority: 20
+
+  - from: "*"
+    event: HIGH_PRESSURE_LOW
+    guard: high_pressure_below_warning_threshold
+    to: IDLE
+    internal: true
+    actions:
+      - emit_low_pressure_warning
+    priority: 50
+    description: Warning only; does not change the current operational state.
 
   - from: "*"
     event: PROTECTION_TRIGGERED

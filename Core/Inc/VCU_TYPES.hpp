@@ -217,6 +217,7 @@ inline constexpr float LOW_PRESSURE_OFFSET = -1.6994576891102104;
 inline constexpr float HIGH_PRESSURE_SLOPE = 112.25464988418591;
 inline constexpr float HIGH_PRESSURE_OFFSET = -38.599525119896384;
 inline constexpr float uncalibrated_linear_offset = 0.0f;
+inline constexpr float high_pressure_warning_threshold_bar = 50.0f;
 
 inline uint8_t general_state = static_cast<uint8_t>(GeneralState::Connecting);
 inline uint8_t operational_state_id = static_cast<uint8_t>(OperationalState::Idle);
@@ -233,6 +234,7 @@ inline float ntc_temperature_2 = 0.0f;
 inline GPIO_PinState sdc_closed_state = GPIO_PIN_RESET;
 inline bool sdc_closed = false;
 inline bool brake_fault_detected = false;
+inline bool tapes_reached = false;
 inline bool sdmmc_card_detected = false;
 inline bool sdmmc_write_protected = false;
 inline bool contactors_closed = false;
@@ -282,6 +284,7 @@ inline SensorInterrupt sdc_closed_sensor;
 
 inline OperationalState operational_state = OperationalState::Idle;
 inline bool flow_capture_initialized = false;
+inline bool high_pressure_warning_active = false;
 
 inline void flow_timer_update_noop(void*) {}
 
@@ -291,6 +294,11 @@ inline constexpr auto sdc_closed_protection = Protections::protection<"sdc_close
 
 inline constexpr auto brake_fault_protection =
     Protections::protection<"brake_fault", brake_fault_detected>(
+        Protections::Rules::equals(true)
+    );
+
+inline constexpr auto tapes_reached_protection =
+    Protections::protection<"tapes_reached", tapes_reached>(
         Protections::Rules::equals(true)
     );
 

@@ -23,7 +23,8 @@ Transitions:
   STATIC_LEVITATION: 
     DYNAMIC_LEVITATION: when an specific order arrives: DYNAMIC_LEVITATION
   *:
-    FAULT: when any protection gets triggered, or we got disconnected from the control station
+    FAULT: when any protection gets triggered, when we reach the tapes, or when we got disconnected from the control station
+    WARNING: when high pressure is less than 50 bar
 Actions:
   Enter:
     IDLE: brake, open contactors, and wait to be connected to the control station and to all the boards we need to connect

@@ -48,13 +48,18 @@ stateDiagram-v2
     STATIC_LEVITATION --> STATIC_LEVITATION: static-levitation-specific orders
     DYNAMIC_LEVITATION --> DYNAMIC_LEVITATION: propulsion + levitation orders
 
-    IDLE --> FAULT: protection triggered\nor control station disconnected
-    CONNECTED --> FAULT: protection triggered\nor control station disconnected
-    MANTEINANCE --> FAULT: protection triggered\nor control station disconnected
-    PRECHARGING --> FAULT: protection triggered\nor control station disconnected
-    HV_ACTIVE --> FAULT: protection triggered\nor control station disconnected
-    READY --> FAULT: protection triggered\nor control station disconnected
-    PROPULSION --> FAULT: protection triggered\nor control station disconnected
-    STATIC_LEVITATION --> FAULT: protection triggered\nor control station disconnected
-    DYNAMIC_LEVITATION --> FAULT: protection triggered\nor control station disconnected
+    IDLE --> IDLE: high pressure < 50 bar\nemit warning
+    CONNECTED --> CONNECTED: high pressure < 50 bar\nemit warning
+    HV_ACTIVE --> HV_ACTIVE: high pressure < 50 bar\nemit warning
+    READY --> READY: high pressure < 50 bar\nemit warning
+
+    IDLE --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    CONNECTED --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    MANTEINANCE --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    PRECHARGING --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    HV_ACTIVE --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    READY --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    PROPULSION --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    STATIC_LEVITATION --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
+    DYNAMIC_LEVITATION --> FAULT: SDC open / brake fault /\ntapes reached / control station disconnected
 ```

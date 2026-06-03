@@ -27,6 +27,8 @@ Current H11 product state machine:
 - `Connected` accepts high-level `MANTEINANCE` and `Precharge` orders. `Stop` returns commandable non-idle modes to `Connected`.
 - `Precharging` sends the formal HVBMS precharge request through the existing high-voltage remote link until a dedicated HVBMS socket/state packet is defined.
 - `Fault` is intentionally part of the current formal product state machine by explicit user request. ST-LIB protections and `FaultController` still provide the underlying fault trigger infrastructure.
+- Current protection/diagnostic policy: SDC open faults, brake fault faults, `tapes_reached` faults, control-station disconnect faults outside `Idle`, and high pressure below 50 bar emits a warning.
+- `tapes_reached` is currently a formal software signal only; H11 has no tape input pin defined in `Pinout.hpp` yet.
 
 ## Current Firmware Shape
 

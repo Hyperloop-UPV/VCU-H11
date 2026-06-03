@@ -33,7 +33,8 @@ using Board = ST_LIB::Board<
     ntc_temperature_2_adc_req,
     flow_timer_req,
     sdc_closed_protection,
-    brake_fault_protection>;
+    brake_fault_protection,
+    tapes_reached_protection>;
 
 inline void init() {
     Board::init();
@@ -105,6 +106,7 @@ inline void init() {
     );
     DataPackets::Safety_init(
         sdc_closed,
+        tapes_reached,
         contactors_closed,
         control_station_connected,
         hvbms_connected,
