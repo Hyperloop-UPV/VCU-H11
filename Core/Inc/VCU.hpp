@@ -35,9 +35,7 @@ using Board = ST_LIB::Board<
     pressure_regulator_out_adc_req,
     ntc_temperature_1_adc_req,
     ntc_temperature_2_adc_req,
-    flow_timer_req,
-    sdc_closed_protection,
-    brake_fault_protection>;
+    flow_timer_req>;
 
 inline void init() {
     Board::init();
@@ -95,105 +93,13 @@ inline void init() {
     led_fault->turn_off();
 
 #ifdef STLIB_ETH
-    DataPackets::VCU_State_init(
-        general_state,
-        operational_state_id,
-        recovery_status,
-        demonstration_bitfield
-    );
-    DataPackets::Flow_init(flow_1, flow_2);
-    DataPackets::Temperatures_init(ntc_temperature_1, ntc_temperature_2);
-    DataPackets::Pressures_init(high_pressure, low_pressure, pressure_regulator_out);
-    DataPackets::Brake_Status_init(active_brakes, brake_fault_detected);
     DataPackets::Outputs_init(
         cooling_pump_1_command,
         cooling_pump_2_command,
         electrovalve_enabled
     );
-    DataPackets::Safety_init(
-        sdc_closed,
-        contactors_closed,
-        control_station_connected,
-        hvscu_connected,
-        pcu_connected,
-        required_peers_connected
-    );
-    DataPackets::HVSCU_State_init(hvscu_state);
-    DataPackets::LCU_State_init(lcu_vertical_state, lcu_horizontal_state);
-    DataPackets::PCU_State_init(pcu_state);
-    DataPackets::Remote_States_init(
-        hvscu_state,
-        pcu_state,
-        lcu_vertical_state,
-        lcu_horizontal_state
-    );
-    DataPackets::VCU_State_For_PCU_init(recovery_status);
-
-    OrderPackets::FAULT_init();
-    OrderPackets::Recovery_init();
-    OrderPackets::Cooling_pump_power_init(cooling_pump_duty, cooling_pump_selection);
-    OrderPackets::Brake_init();
-    OrderPackets::Close_contactors_init();
-    OrderPackets::Unbrake_init();
-    OrderPackets::Open_contactors_init();
-    OrderPackets::Emergency_stop_init();
-    OrderPackets::Runs_init(run_id);
-    OrderPackets::SVPWM_init(
-        modulation_frequency_1,
-        commutation_frequency_1,
-        reference_voltage_1,
-        max_voltage_1,
-        motor_direction_1
-    );
-    OrderPackets::Stop_motor_init();
-    OrderPackets::Current_control_init(
-        modulation_frequency_2,
-        commutation_frequency_2,
-        reference_current_2,
-        max_voltage_2,
-        motor_direction_2
-    );
-    OrderPackets::Speed_control_init(
-        reference_speed_3,
-        commutation_frequency_3,
-        max_voltage_3,
-        motor_direction_3
-    );
-    OrderPackets::Motor_brake_init();
-    OrderPackets::Levitation_init(levitation_distance);
-    OrderPackets::Stop_levitation_init();
-    OrderPackets::Booster_init();
-    OrderPackets::Stop_booster_init();
-    OrderPackets::Remote_close_contactors_init();
-    OrderPackets::Remote_open_contactors_init();
-    OrderPackets::Remote_runs_init(run_id);
-    OrderPackets::Remote_SVPWM_init(
-        modulation_frequency_1,
-        commutation_frequency_1,
-        reference_voltage_1,
-        max_voltage_1,
-        motor_direction_1
-    );
-    OrderPackets::Remote_stop_motor_init();
-    OrderPackets::Remote_current_control_init(
-        modulation_frequency_2,
-        commutation_frequency_2,
-        reference_current_2,
-        max_voltage_2,
-        motor_direction_2
-    );
-    OrderPackets::Remote_speed_control_init(
-        reference_speed_3,
-        commutation_frequency_3,
-        max_voltage_3,
-        motor_direction_3
-    );
-    OrderPackets::Remote_motor_brake_init();
-    OrderPackets::Remote_levitation_init(levitation_distance);
-    OrderPackets::Remote_stop_levitation_init();
-    OrderPackets::Remote_booster_init();
-    OrderPackets::Remote_stop_booster_init();
-    OrderPackets::Forward_booster_init();
+    OrderPackets::Turn_on_electrovalve_init();
+    OrderPackets::Turn_off_electrovalve_init();
 
     OrderPackets::start();
     DataPackets::start();
@@ -208,7 +114,6 @@ inline void update() {
 #endif
     VCU_StateMachine::update();
     FaultController::check_transitions();
-    Board::evaluate_protections();
     Diagnostics::Hub::flush();
     Scheduler::update();
 }

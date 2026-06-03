@@ -280,15 +280,6 @@ inline bool flow_capture_initialized = false;
 
 inline void flow_timer_update_noop(void*) {}
 
-inline constexpr auto sdc_closed_protection = Protections::protection<"sdc_closed", sdc_closed>(
-    Protections::Rules::equals(false)
-);
-
-inline constexpr auto brake_fault_protection =
-    Protections::protection<"brake_fault", brake_fault_detected>(
-        Protections::Rules::equals(true)
-    );
-
 inline void sync_state_telemetry() {
     if (FaultController::is_faulted()) {
         general_state = static_cast<uint8_t>(GeneralState::Fault);
@@ -330,6 +321,15 @@ inline void release_brake() {
     if (brake_reset != nullptr) {
         brake_reset->turn_on();
     }
+}
+
+inline void set_electrovalve(bool enabled) {
+    electrovalve_enabled = enabled;
+    if (electrovalve == nullptr) {
+        return;
+    }
+
+    enabled ? electrovalve->turn_on() : electrovalve->turn_off();
 }
 
 template <ST_LIB::TimerChannel Channel> inline void configure_flow_capture_channel() {
