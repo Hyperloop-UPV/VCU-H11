@@ -24,7 +24,7 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     ST_LIB::EthernetDomain::PINSET_H11,
     "00:80:e1:00:01:03",
     "192.168.1.3",
-    "255.255.255.0"
+    "255.255.0.0"
 );
 #elif defined(USE_PHY_KSZ8041)
 inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
@@ -247,6 +247,10 @@ inline bool pcu_connected = false;
 inline bool lcu_connected = false;
 inline bool required_peers_connected = false;
 inline bool required_peers_were_connected = false;
+inline bool control_station_was_connected = false;
+inline bool hvbms_was_connected = false;
+inline bool pcu_was_connected = false;
+inline bool lcu_was_connected = false;
 
 inline uint8_t cooling_pump_duty = 0;
 inline uint8_t cooling_pump_selection = static_cast<uint8_t>(PumpSelection::CoolingPump1);

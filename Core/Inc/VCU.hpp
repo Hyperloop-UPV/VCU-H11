@@ -33,7 +33,9 @@ using Board = ST_LIB::Board<
     ntc_temperature_2_adc_req,
     flow_timer_req,
     sdc_closed_protection,
+#ifndef DISABLE_BRAKE_FAULT_PROTECTION
     brake_fault_protection,
+#endif
     tapes_reached_protection>;
 
 inline void init() {
@@ -118,19 +120,6 @@ inline void init() {
         required_peers_connected
 #endif
     );
-#ifndef SINGLE
-    DataPackets::HVBMS_State_init(hvbms_state);
-    DataPackets::LCU_State_init(lcu_vertical_state, lcu_horizontal_state);
-    DataPackets::PCU_State_init(pcu_state);
-    DataPackets::Remote_States_init(
-        hvbms_state,
-        pcu_state,
-        lcu_vertical_state,
-        lcu_horizontal_state
-    );
-    DataPackets::VCU_State_For_PCU_init(recovery_status);
-#endif
-
     OrderPackets::FAULT_init();
     OrderPackets::Cooling_pump_power_init(cooling_pump_duty, cooling_pump_selection);
     OrderPackets::MANTEINANCE_init();
@@ -177,36 +166,6 @@ inline void init() {
     OrderPackets::Stop_levitation_init();
     OrderPackets::Booster_init();
     OrderPackets::Stop_booster_init();
-    OrderPackets::Remote_close_contactors_init();
-    OrderPackets::Remote_open_contactors_init();
-    OrderPackets::Remote_precharge_init();
-    OrderPackets::Remote_runs_init(run_id);
-    OrderPackets::Remote_SVPWM_init(
-        modulation_frequency_1,
-        commutation_frequency_1,
-        reference_voltage_1,
-        max_voltage_1,
-        motor_direction_1
-    );
-    OrderPackets::Remote_stop_motor_init();
-    OrderPackets::Remote_current_control_init(
-        modulation_frequency_2,
-        commutation_frequency_2,
-        reference_current_2,
-        max_voltage_2,
-        motor_direction_2
-    );
-    OrderPackets::Remote_speed_control_init(
-        reference_speed_3,
-        commutation_frequency_3,
-        max_voltage_3,
-        motor_direction_3
-    );
-    OrderPackets::Remote_motor_brake_init();
-    OrderPackets::Remote_levitation_init(levitation_distance);
-    OrderPackets::Remote_stop_levitation_init();
-    OrderPackets::Remote_booster_init();
-    OrderPackets::Remote_stop_booster_init();
     OrderPackets::Forward_booster_init();
 #endif
 

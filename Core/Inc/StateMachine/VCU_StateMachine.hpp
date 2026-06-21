@@ -2,11 +2,18 @@
 #define VCU_STATE_MACHINE_HPP
 
 #include "Communications/Packets/OrderPackets.hpp"
+#include "Mocks/MockHeartbeat.hpp"
 #include "VCU_TYPES.hpp"
 
 namespace VCU_StateMachine {
 
 namespace Detail {
+
+inline void transition_to_fault(const char* reason);
+
+#ifndef SINGLE
+inline StackOrder<0> mock_heartbeat_order{MockHeartbeat::order_id};
+#endif
 
 inline bool is_state(VCU::OperationalState state) {
     return VCU::operational_state == state;
@@ -63,6 +70,41 @@ inline bool socket_connected(auto* socket) {
     return socket != nullptr && socket->is_connected();
 }
 
+inline void reconnect_if_needed(auto* socket) {
+    if (socket != nullptr && !socket->is_connected()) {
+        socket->reconnect();
+    }
+}
+
+inline void handle_connection_change(
+    bool connected,
+    bool& was_connected,
+    const char* board_name,
+    const char* disconnect_reason
+) {
+    if (connected && !was_connected) {
+        INFO("%s connected to master", board_name);
+    } else if (!connected && was_connected) {
+        transition_to_fault(disconnect_reason);
+    }
+    was_connected = connected;
+}
+
+inline bool required_remote_peers_connected() {
+    return VCU::hvbms_connected && VCU::lcu_connected;
+}
+
+inline void send_mock_heartbeat() {
+#ifndef SINGLE
+    if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected()) {
+        OrderPackets::hvbms_tcp->send_order(mock_heartbeat_order);
+    }
+    if (OrderPackets::lcu_tcp != nullptr && OrderPackets::lcu_tcp->is_connected()) {
+        OrderPackets::lcu_tcp->send_order(mock_heartbeat_order);
+    }
+#endif
+}
+
 inline bool send_remote_order(auto* socket, HeapOrder* order, const char* description) {
     if (socket == nullptr || order == nullptr) {
         FAULT("Cannot send %s: socket or order is not initialized", description);
@@ -84,8 +126,8 @@ inline void request_open_contactors() {
     VCU::contactors_closed = false;
 #else
     if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected() &&
-        OrderPackets::Remote_open_contactors_order != nullptr) {
-        OrderPackets::hvbms_tcp->send_order(*OrderPackets::Remote_open_contactors_order);
+        OrderPackets::Open_contactors_order != nullptr) {
+        OrderPackets::hvbms_tcp->send_order(*OrderPackets::Open_contactors_order);
     }
     VCU::contactors_closed = false;
 #endif
@@ -97,7 +139,7 @@ inline void request_precharge() {
 #else
     send_remote_order(
         OrderPackets::hvbms_tcp,
-        OrderPackets::Remote_precharge_order,
+        OrderPackets::Precharge_order,
         "precharge"
     );
 #endif
@@ -107,7 +149,7 @@ inline void stop_propulsion() {
 #ifndef SINGLE
     send_remote_order(
         OrderPackets::pcu_tcp,
-        OrderPackets::Remote_stop_motor_order,
+        OrderPackets::Stop_motor_order,
         "stop propulsion"
     );
 #endif
@@ -117,7 +159,7 @@ inline void stop_levitation() {
 #ifndef SINGLE
     send_remote_order(
         OrderPackets::lcu_tcp,
-        OrderPackets::Remote_stop_levitation_order,
+        OrderPackets::Stop_levitation_order,
         "stop levitation"
     );
 #endif
@@ -125,7 +167,7 @@ inline void stop_levitation() {
 
 inline void start_propulsion() {
 #ifndef SINGLE
-    send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Remote_runs_order, "propulsion");
+    send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Runs_order, "propulsion");
 #endif
 }
 
@@ -133,7 +175,7 @@ inline void start_static_levitation() {
 #ifndef SINGLE
     send_remote_order(
         OrderPackets::lcu_tcp,
-        OrderPackets::Remote_levitation_order,
+        OrderPackets::Levitation_order,
         "static levitation"
     );
 #endif
@@ -166,11 +208,46 @@ inline void refresh_connections() {
     VCU::lcu_connected = false;
     VCU::required_peers_connected = VCU::control_station_connected;
 #else
+    reconnect_if_needed(OrderPackets::hvbms_tcp);
+    reconnect_if_needed(OrderPackets::pcu_tcp);
+    reconnect_if_needed(OrderPackets::lcu_tcp);
+
     VCU::hvbms_connected = socket_connected(OrderPackets::hvbms_tcp);
     VCU::pcu_connected = socket_connected(OrderPackets::pcu_tcp);
     VCU::lcu_connected = socket_connected(OrderPackets::lcu_tcp);
-    VCU::required_peers_connected = VCU::control_station_connected && VCU::hvbms_connected &&
-                                    VCU::pcu_connected && VCU::lcu_connected;
+    VCU::required_peers_connected =
+        VCU::control_station_connected && required_remote_peers_connected();
+#endif
+
+    handle_connection_change(
+        VCU::control_station_connected,
+        VCU::control_station_was_connected,
+        "Control station",
+        "Control station disconnected"
+    );
+#ifndef SINGLE
+    handle_connection_change(
+        VCU::hvbms_connected,
+        VCU::hvbms_was_connected,
+        "HVBMS",
+        "HVBMS disconnected"
+    );
+    handle_connection_change(
+        VCU::pcu_connected,
+        VCU::pcu_was_connected,
+        "PCU",
+        "PCU disconnected"
+    );
+    handle_connection_change(
+        VCU::lcu_connected,
+        VCU::lcu_was_connected,
+        "LCU",
+        "LCU disconnected"
+    );
+#else
+    VCU::hvbms_was_connected = false;
+    VCU::pcu_was_connected = false;
+    VCU::lcu_was_connected = false;
 #endif
 
     if (VCU::required_peers_connected) {
@@ -271,10 +348,12 @@ inline void check_fault_inputs() {
         return;
     }
 
+#ifndef DISABLE_BRAKE_FAULT_PROTECTION
     if (VCU::brake_fault_detected) {
         transition_to_fault("Brake fault detected");
         return;
     }
+#endif
 
     if (VCU::tapes_reached) {
         transition_to_fault("Tapes reached");
@@ -286,10 +365,6 @@ inline void check_fault_inputs() {
         return;
     }
 
-    if (VCU::required_peers_were_connected && !VCU::control_station_connected &&
-        !is_state(VCU::OperationalState::Idle)) {
-        transition_to_fault("Control station disconnected");
-    }
 }
 
 inline void handle_connection_transition() {
@@ -438,17 +513,17 @@ inline void handle_propulsion_orders() {
 
     if (OrderPackets::Runs_flag) {
         OrderPackets::Runs_flag = false;
-        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Remote_runs_order, "runs");
+        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Runs_order, "runs");
     }
     if (OrderPackets::SVPWM_flag) {
         OrderPackets::SVPWM_flag = false;
-        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Remote_SVPWM_order, "SVPWM");
+        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::SVPWM_order, "SVPWM");
     }
     if (OrderPackets::Current_control_flag) {
         OrderPackets::Current_control_flag = false;
         send_remote_order(
             OrderPackets::pcu_tcp,
-            OrderPackets::Remote_current_control_order,
+            OrderPackets::Current_control_order,
             "current control"
         );
     }
@@ -456,7 +531,7 @@ inline void handle_propulsion_orders() {
         OrderPackets::Speed_control_flag = false;
         send_remote_order(
             OrderPackets::pcu_tcp,
-            OrderPackets::Remote_speed_control_order,
+            OrderPackets::Speed_control_order,
             "speed control"
         );
     }
@@ -464,7 +539,7 @@ inline void handle_propulsion_orders() {
         OrderPackets::Motor_brake_flag = false;
         send_remote_order(
             OrderPackets::pcu_tcp,
-            OrderPackets::Remote_motor_brake_order,
+            OrderPackets::Motor_brake_order,
             "motor brake"
         );
     }
@@ -484,7 +559,7 @@ inline void handle_levitation_orders() {
         OrderPackets::Levitation_flag = false;
         send_remote_order(
             OrderPackets::lcu_tcp,
-            OrderPackets::Remote_levitation_order,
+            OrderPackets::Levitation_order,
             "levitation"
         );
     }
@@ -493,19 +568,6 @@ inline void handle_levitation_orders() {
 
 inline void clear_remote_callback_flags() {
 #ifndef SINGLE
-    OrderPackets::Remote_close_contactors_flag = false;
-    OrderPackets::Remote_open_contactors_flag = false;
-    OrderPackets::Remote_precharge_flag = false;
-    OrderPackets::Remote_runs_flag = false;
-    OrderPackets::Remote_SVPWM_flag = false;
-    OrderPackets::Remote_stop_motor_flag = false;
-    OrderPackets::Remote_current_control_flag = false;
-    OrderPackets::Remote_speed_control_flag = false;
-    OrderPackets::Remote_motor_brake_flag = false;
-    OrderPackets::Remote_levitation_flag = false;
-    OrderPackets::Remote_stop_levitation_flag = false;
-    OrderPackets::Remote_booster_flag = false;
-    OrderPackets::Remote_stop_booster_flag = false;
     OrderPackets::Forward_booster_flag = false;
 #endif
 }
@@ -544,6 +606,13 @@ inline void update_status_leds() {
         return;
     }
 
+    if (is_state(VCU::OperationalState::Idle)) {
+        VCU::led_connecting->turn_off();
+        VCU::led_fault->turn_off();
+        VCU::led_operational->toggle();
+        return;
+    }
+
     VCU::led_operational->turn_off();
     VCU::led_fault->turn_off();
     VCU::led_connecting->toggle();
@@ -558,6 +627,7 @@ inline void start() {
     Detail::refresh_connections();
     Scheduler::register_task(100'000, +[]() { Detail::sample_inputs(); });
     Scheduler::register_task(200'000, +[]() { Detail::update_status_leds(); });
+    Scheduler::register_task(MockHeartbeat::period_us, +[]() { Detail::send_mock_heartbeat(); });
 }
 
 inline void update() {
