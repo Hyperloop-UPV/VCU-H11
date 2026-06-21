@@ -9,6 +9,9 @@ set(BOARD_NAME "VCU" CACHE STRING "Board key from Core/Inc/Code_generation/JSON_
 if(BOARD_NAME STREQUAL "")
   message(FATAL_ERROR "BOARD_NAME cannot be empty")
 endif()
+set(VCU_APP_TARGET "master" CACHE STRING "Application entry point: master, hvbms_mock, or lcu_mock")
+set_property(CACHE VCU_APP_TARGET PROPERTY STRINGS master hvbms_mock lcu_mock)
+set(VCU_MOCK_MASTER_TCP_PORT "50500" CACHE STRING "TCP port that mock peers use when connecting to the VCU")
 set(STLIB_DIR ${CMAKE_CURRENT_LIST_DIR}/deps/ST-LIB)
 set(LD_SCRIPT ${STLIB_DIR}/STM32H723ZGTX_FLASH.ld)
 
@@ -30,9 +33,10 @@ endif()
 option(USE_ETHERNET "Enable ethernet peripheral" OFF)
 option(SINGLE "Build VCU for single-board testing without remote-board sockets" OFF)
 option(TARGET_NUCLEO "Targets the STM32H723 Nucleo development board" OFF)
+option(DISABLE_BRAKE_FAULT_PROTECTION "Temporarily disable brake fault protection for bench testing" ON)
 option(USE_CCACHE "Use ccache if available" ON)
 if(NOT USE_ETHERNET)
-  message(FATAL_ERROR "VCU-H11 requires Ethernet. Use an Ethernet preset such as board-debug-eth-lan8700.")
+  message(FATAL_ERROR "VCU-H11 requires Ethernet. Use an Ethernet preset such as board-debug-eth-ksz8041.")
 endif()
 if(NOT DEFINED ENABLE_LTO)
   if(CMAKE_CROSSCOMPILING)
@@ -57,6 +61,27 @@ message(STATUS "VCU-H11: USE_ETHERNET         = ${USE_ETHERNET}")
 message(STATUS "VCU-H11: SINGLE               = ${SINGLE}")
 message(STATUS "VCU-H11: TARGET_NUCLEO        = ${TARGET_NUCLEO}")
 message(STATUS "VCU-H11: BOARD_NAME           = ${BOARD_NAME}")
+message(STATUS "VCU-H11: VCU_APP_TARGET       = ${VCU_APP_TARGET}")
+message(STATUS "VCU-H11: DISABLE_BRAKE_FAULT_PROTECTION = ${DISABLE_BRAKE_FAULT_PROTECTION}")
+
+set(VCU_MASTER_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/main.cpp)
+set(VCU_HVBMS_MOCK_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/Mocks/hvbms_mock_main.cpp)
+set(VCU_LCU_MOCK_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/Mocks/lcu_mock_main.cpp)
+set(VCU_APP_MAIN_SOURCES
+  ${VCU_MASTER_MAIN_SOURCE}
+  ${VCU_HVBMS_MOCK_MAIN_SOURCE}
+  ${VCU_LCU_MOCK_MAIN_SOURCE}
+)
+
+if(VCU_APP_TARGET STREQUAL "master")
+  set(VCU_SELECTED_MAIN_SOURCE ${VCU_MASTER_MAIN_SOURCE})
+elseif(VCU_APP_TARGET STREQUAL "hvbms_mock")
+  set(VCU_SELECTED_MAIN_SOURCE ${VCU_HVBMS_MOCK_MAIN_SOURCE})
+elseif(VCU_APP_TARGET STREQUAL "lcu_mock")
+  set(VCU_SELECTED_MAIN_SOURCE ${VCU_LCU_MOCK_MAIN_SOURCE})
+else()
+  message(FATAL_ERROR "Unsupported VCU_APP_TARGET '${VCU_APP_TARGET}'. Expected master, hvbms_mock, or lcu_mock.")
+endif()
 
 add_subdirectory(${STLIB_DIR})
 message(STATUS "Using ST-LIB target: ${STLIB_LIBRARY}")
@@ -68,11 +93,11 @@ file(GLOB_RECURSE GENERATOR_JSONS
 
 set(GENERATED_DATA_PACKETS ${CMAKE_SOURCE_DIR}/Core/Inc/Communications/Packets/DataPackets.hpp)
 set(GENERATED_ORDER_PACKETS ${CMAKE_SOURCE_DIR}/Core/Inc/Communications/Packets/OrderPackets.hpp)
-add_custom_command(
-  OUTPUT
+add_custom_target(run_generator
+  COMMAND ${PYTHON_FOR_TOOLS} ${GENERATOR_SCRIPT} ${BOARD_NAME}
+  BYPRODUCTS
   ${GENERATED_DATA_PACKETS}
   ${GENERATED_ORDER_PACKETS}
-  COMMAND ${PYTHON_FOR_TOOLS} ${GENERATOR_SCRIPT} ${BOARD_NAME}
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   DEPENDS
   ${GENERATOR_SCRIPT}
@@ -82,12 +107,6 @@ add_custom_command(
   ${CMAKE_SOURCE_DIR}/Core/Inc/Code_generation/Packet_generation/OrderTemplate.hpp
   ${GENERATOR_JSONS}
   COMMENT "Generating packets for ${BOARD_NAME}"
-)
-
-add_custom_target(run_generator
-  DEPENDS
-  ${GENERATED_DATA_PACKETS}
-  ${GENERATED_ORDER_PACKETS}
 )
 
 file(GLOB_RECURSE METADATA_SOURCES
@@ -124,6 +143,8 @@ if(CMAKE_CROSSCOMPILING)
   file(GLOB_RECURSE SOURCE_CPP CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/Core/*.cpp)
   file(GLOB_RECURSE SOURCE_H CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/Core/*.h)
   file(GLOB_RECURSE SOURCE_HPP CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/Core/*.hpp)
+  list(REMOVE_ITEM SOURCE_CPP ${VCU_APP_MAIN_SOURCES})
+  list(APPEND SOURCE_CPP ${VCU_SELECTED_MAIN_SOURCE})
 
   add_executable(${EXECUTABLE}
     ${SOURCE_C}
@@ -148,8 +169,10 @@ if(CMAKE_CROSSCOMPILING)
   target_compile_definitions(${EXECUTABLE} PRIVATE
     $<$<BOOL:${USE_ETHERNET}>:STLIB_ETH>
     $<$<BOOL:${SINGLE}>:SINGLE>
+    $<$<BOOL:${DISABLE_BRAKE_FAULT_PROTECTION}>:DISABLE_BRAKE_FAULT_PROTECTION>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,NUCLEO,BOARD>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,HSE_VALUE=8000000,HSE_VALUE=25000000>
+    VCU_MOCK_MASTER_TCP_PORT=${VCU_MOCK_MASTER_TCP_PORT}
   )
 
   target_compile_options(${EXECUTABLE} PRIVATE

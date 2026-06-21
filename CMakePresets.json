@@ -69,6 +69,28 @@
             }
         },
         {
+            "name": "nucleo-debug-eth-hvbms-mock",
+            "displayName": "Nucleo [DBG] [ETH] [HVBMS Mock]",
+            "inherits": [
+                "nucleo-debug-eth"
+            ],
+            "cacheVariables": {
+                "BOARD_NAME": "HVBMSMOCK",
+                "VCU_APP_TARGET": "hvbms_mock"
+            }
+        },
+        {
+            "name": "nucleo-debug-eth-lcu-mock",
+            "displayName": "Nucleo [DBG] [ETH] [LCU Mock]",
+            "inherits": [
+                "nucleo-debug-eth"
+            ],
+            "cacheVariables": {
+                "BOARD_NAME": "LCUMOCK",
+                "VCU_APP_TARGET": "lcu_mock"
+            }
+        },
+        {
             "name": "nucleo-release-eth",
             "displayName": "Nucleo [REL] [ETH]",
             "inherits": [
@@ -132,6 +154,19 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "USE_ETHERNET": "ON",
                 "PHY_TYPE": "KSZ8041"
+            }
+        },
+        {
+            "name": "board-debug-eth-ksz8041-single",
+            "displayName": "Board [DBG] [ETH] [KSZ8041] [SINGLE]",
+            "inherits": [
+                "mcu"
+            ],
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "USE_ETHERNET": "ON",
+                "PHY_TYPE": "KSZ8041",
+                "SINGLE": "ON"
             }
         },
         {
@@ -247,6 +282,14 @@
             "configurePreset": "nucleo-debug-eth"
         },
         {
+            "name": "nucleo-debug-eth-hvbms-mock",
+            "configurePreset": "nucleo-debug-eth-hvbms-mock"
+        },
+        {
+            "name": "nucleo-debug-eth-lcu-mock",
+            "configurePreset": "nucleo-debug-eth-lcu-mock"
+        },
+        {
             "name": "nucleo-release-eth",
             "configurePreset": "nucleo-release-eth"
         },
@@ -269,6 +312,10 @@
         {
             "name": "board-debug-eth-ksz8041",
             "configurePreset": "board-debug-eth-ksz8041"
+        },
+        {
+            "name": "board-debug-eth-ksz8041-single",
+            "configurePreset": "board-debug-eth-ksz8041-single"
         },
         {
             "name": "board-debug-eth-lan8700",
