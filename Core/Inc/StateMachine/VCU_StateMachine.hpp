@@ -2,7 +2,6 @@
 #define VCU_STATE_MACHINE_HPP
 
 #include "Communications/Packets/OrderPackets.hpp"
-#include "Mocks/MockHeartbeat.hpp"
 #include "VCU_TYPES.hpp"
 
 namespace VCU_StateMachine {
@@ -10,10 +9,6 @@ namespace VCU_StateMachine {
 namespace Detail {
 
 inline void transition_to_fault(const char* reason);
-
-#ifndef SINGLE
-inline StackOrder<0> mock_heartbeat_order{MockHeartbeat::order_id};
-#endif
 
 inline bool is_state(VCU::OperationalState state) {
     return VCU::operational_state == state;
@@ -92,17 +87,6 @@ inline void handle_connection_change(
 
 inline bool required_remote_peers_connected() {
     return VCU::hvbms_connected && VCU::lcu_connected;
-}
-
-inline void send_mock_heartbeat() {
-#ifndef SINGLE
-    if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected()) {
-        OrderPackets::hvbms_tcp->send_order(mock_heartbeat_order);
-    }
-    if (OrderPackets::lcu_tcp != nullptr && OrderPackets::lcu_tcp->is_connected()) {
-        OrderPackets::lcu_tcp->send_order(mock_heartbeat_order);
-    }
-#endif
 }
 
 inline bool send_remote_order(auto* socket, HeapOrder* order, const char* description) {
@@ -627,7 +611,6 @@ inline void start() {
     Detail::refresh_connections();
     Scheduler::register_task(100'000, +[]() { Detail::sample_inputs(); });
     Scheduler::register_task(200'000, +[]() { Detail::update_status_leds(); });
-    Scheduler::register_task(MockHeartbeat::period_us, +[]() { Detail::send_mock_heartbeat(); });
 }
 
 inline void update() {
