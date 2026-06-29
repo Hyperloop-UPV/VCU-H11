@@ -2,6 +2,7 @@
 #define VCU_TYPES_HPP
 
 #include "Pinout/Pinout.hpp"
+#include "Communications/Packets/DataPackets.hpp"
 #include "ST-LIB.hpp"
 
 #include <cstdint>
@@ -21,7 +22,7 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
 );
 #elif defined(USE_PHY_LAN8700)
 inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
-    ST_LIB::EthernetDomain::PINSET_H11,
+    ST_LIB::EthernetDomain::PINSET_H10,
     "00:80:e1:00:01:03",
     "192.168.1.3",
     "255.255.0.0"
@@ -62,6 +63,8 @@ inline constexpr auto brake_reset_req =
 
 inline constexpr auto brake_fault_req =
     ST_LIB::DigitalInputDomain::DigitalInput(Pinout::brake_fault);
+
+// These should just be part of sdmmc
 inline constexpr auto sdmmc_card_detect_req =
     ST_LIB::DigitalInputDomain::DigitalInput(Pinout::sdmmc_card_detect);
 inline constexpr auto sdmmc_write_protect_req =
@@ -219,8 +222,8 @@ inline constexpr float HIGH_PRESSURE_OFFSET = -38.599525119896384;
 inline constexpr float uncalibrated_linear_offset = 0.0f;
 inline constexpr float high_pressure_warning_threshold_bar = 50.0f;
 
-inline uint8_t general_state = static_cast<uint8_t>(GeneralState::Connecting);
-inline uint8_t operational_state_id = static_cast<uint8_t>(OperationalState::Idle);
+inline DataPackets::general_state general_state = DataPackets::general_state::Connecting;
+inline DataPackets::operational_state operational_state_id = DataPackets::operational_state::Idle;
 inline uint8_t recovery_status = 0;
 inline uint32_t demonstration_bitfield = 0;
 
@@ -257,10 +260,10 @@ inline uint8_t cooling_pump_selection = static_cast<uint8_t>(PumpSelection::Cool
 inline uint8_t cooling_pump_1_command = 0;
 inline uint8_t cooling_pump_2_command = 0;
 
-inline uint8_t hvbms_state = static_cast<uint8_t>(HVBMSState::Opened);
-inline uint8_t pcu_state = static_cast<uint8_t>(PCUState::Stopped);
-inline uint8_t lcu_vertical_state = static_cast<uint8_t>(LCUState::Stopped);
-inline uint8_t lcu_horizontal_state = static_cast<uint8_t>(BoosterState::Disabled);
+inline DataPackets::hvbms_state hvbms_state = DataPackets::hvbms_state::Opened;
+inline DataPackets::pcu_state pcu_state = DataPackets::pcu_state::Stopped;
+inline DataPackets::lcu_vertical_state lcu_vertical_state = DataPackets::lcu_vertical_state::Stopped;
+inline DataPackets::lcu_horizontal_state lcu_horizontal_state = DataPackets::lcu_horizontal_state::Disabled;
 
 inline uint8_t run_id = 0;
 inline float modulation_frequency_1 = 0.0f;
@@ -308,14 +311,14 @@ inline constexpr auto tapes_reached_protection =
 
 inline void sync_state_telemetry() {
     if (FaultController::is_faulted()) {
-        general_state = static_cast<uint8_t>(GeneralState::Fault);
+        general_state = DataPackets::general_state::Fault;
     } else if (required_peers_connected) {
-        general_state = static_cast<uint8_t>(GeneralState::Operational);
+        general_state = DataPackets::general_state::Operational;
     } else {
-        general_state = static_cast<uint8_t>(GeneralState::Connecting);
+        general_state = DataPackets::general_state::Connecting;
     }
 
-    operational_state_id = static_cast<uint8_t>(operational_state);
+    operational_state_id = static_cast<DataPackets::operational_state>(operational_state);
 }
 
 inline void set_cooling_pump(PumpSelection selection, uint8_t duty) {

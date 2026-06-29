@@ -9,8 +9,8 @@ set(BOARD_NAME "VCU" CACHE STRING "Board key from Core/Inc/Code_generation/JSON_
 if(BOARD_NAME STREQUAL "")
   message(FATAL_ERROR "BOARD_NAME cannot be empty")
 endif()
-set(VCU_APP_TARGET "master" CACHE STRING "Application entry point: master, hvbms_mock, or lcu_mock")
-set_property(CACHE VCU_APP_TARGET PROPERTY STRINGS master hvbms_mock lcu_mock)
+set(VCU_APP_TARGET "master" CACHE STRING "Application entry point: master, hvbms_mock, lcu_mock, or pcu_mock")
+set_property(CACHE VCU_APP_TARGET PROPERTY STRINGS master hvbms_mock lcu_mock pcu_mock)
 set(VCU_MOCK_MASTER_TCP_PORT "50500" CACHE STRING "TCP port that mock peers use when connecting to the VCU")
 set(STLIB_DIR ${CMAKE_CURRENT_LIST_DIR}/deps/ST-LIB)
 set(LD_SCRIPT ${STLIB_DIR}/STM32H723ZGTX_FLASH.ld)
@@ -67,10 +67,12 @@ message(STATUS "VCU-H11: DISABLE_BRAKE_FAULT_PROTECTION = ${DISABLE_BRAKE_FAULT_
 set(VCU_MASTER_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/main.cpp)
 set(VCU_HVBMS_MOCK_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/Mocks/hvbms_mock_main.cpp)
 set(VCU_LCU_MOCK_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/Mocks/lcu_mock_main.cpp)
+set(VCU_PCU_MOCK_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/Mocks/pcu_mock_main.cpp)
 set(VCU_APP_MAIN_SOURCES
   ${VCU_MASTER_MAIN_SOURCE}
   ${VCU_HVBMS_MOCK_MAIN_SOURCE}
   ${VCU_LCU_MOCK_MAIN_SOURCE}
+  ${VCU_PCU_MOCK_MAIN_SOURCE}
 )
 
 if(VCU_APP_TARGET STREQUAL "master")
@@ -79,8 +81,10 @@ elseif(VCU_APP_TARGET STREQUAL "hvbms_mock")
   set(VCU_SELECTED_MAIN_SOURCE ${VCU_HVBMS_MOCK_MAIN_SOURCE})
 elseif(VCU_APP_TARGET STREQUAL "lcu_mock")
   set(VCU_SELECTED_MAIN_SOURCE ${VCU_LCU_MOCK_MAIN_SOURCE})
+elseif(VCU_APP_TARGET STREQUAL "pcu_mock")
+  set(VCU_SELECTED_MAIN_SOURCE ${VCU_PCU_MOCK_MAIN_SOURCE})
 else()
-  message(FATAL_ERROR "Unsupported VCU_APP_TARGET '${VCU_APP_TARGET}'. Expected master, hvbms_mock, or lcu_mock.")
+  message(FATAL_ERROR "Unsupported VCU_APP_TARGET '${VCU_APP_TARGET}'. Expected master, hvbms_mock, lcu_mock, or pcu_mock.")
 endif()
 
 add_subdirectory(${STLIB_DIR})
@@ -173,6 +177,7 @@ if(CMAKE_CROSSCOMPILING)
     $<IF:$<BOOL:${TARGET_NUCLEO}>,NUCLEO,BOARD>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,HSE_VALUE=8000000,HSE_VALUE=25000000>
     VCU_MOCK_MASTER_TCP_PORT=${VCU_MOCK_MASTER_TCP_PORT}
+    $<$<AND:$<NOT:$<BOOL:${TARGET_NUCLEO}>>,$<NOT:$<STREQUAL:${VCU_APP_TARGET},master>>>:MOCK_NO_LEDS>
   )
 
   target_compile_options(${EXECUTABLE} PRIVATE

@@ -3,13 +3,13 @@
 #include "ST-LIB.hpp"
 #include "main.h"
 
-namespace HVBMSMock {
+namespace PCUMock {
 
-inline constexpr const char* local_ip = "192.168.1.7";
+inline constexpr const char* local_ip = "192.168.1.5";
 
 inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     MockPeer::ethernet_pinset,
-    "00:80:e1:00:01:07",
+    "00:80:e1:00:01:05",
     local_ip,
     "255.255.0.0"
 );
@@ -25,7 +25,8 @@ inline ServerSocket* vcu_socket = nullptr;
 inline bool connected_to_master = false;
 inline bool was_connected_to_master = false;
 
-inline DataPackets::hvbms_state hvbms_state = DataPackets::hvbms_state::Opened;
+inline DataPackets::pcu_state pcu_state = DataPackets::pcu_state::Stopped;
+inline uint8_t dummy_run_id = 0;
 
 #ifndef MOCK_NO_LEDS
 inline void update_leds() {
@@ -50,19 +51,18 @@ inline void init() {
 
     Diagnostics::install_ethernet_sink(vcu_socket);
 
-    new HeapOrder(35, +[]() {
-        hvbms_state = DataPackets::hvbms_state::Closed;
-    });
-    new HeapOrder(53, +[]() {
-        hvbms_state = DataPackets::hvbms_state::Opened;
+    new HeapOrder(56, +[]() {
+        pcu_state = DataPackets::pcu_state::Propulsion;
+    }, &dummy_run_id);
+    new HeapOrder(58, +[]() {
+        pcu_state = DataPackets::pcu_state::Stopped;
     });
     new HeapOrder(0, +[]() {
-        hvbms_state = DataPackets::hvbms_state::Opened;
+        pcu_state = DataPackets::pcu_state::Stopped;
     });
 
-
-    DataPackets::HVBMS_Mock_Connection_Status_init(connected_to_master);
-    DataPackets::HVBMS_State_init(hvbms_state);
+    DataPackets::PCU_Mock_Connection_Status_init(connected_to_master);
+    DataPackets::PCU_State_init(pcu_state);
     DataPackets::start();
 #ifndef MOCK_NO_LEDS
     Scheduler::register_task(200'000, +[]() { update_leds(); });
@@ -79,14 +79,14 @@ inline void update() {
     );
 }
 
-} // namespace HVBMSMock
+} // namespace PCUMock
 
 int main(void) {
     Hard_fault_check();
-    HVBMSMock::init();
+    PCUMock::init();
 
     while (1) {
-        HVBMSMock::update();
+        PCUMock::update();
     }
 }
 

@@ -15,6 +15,9 @@ inline auto& led_can = ST_LIB::PG10;
 inline auto& led_connecting = ST_LIB::PG11;
 inline auto& led_fault = ST_LIB::PG12;
 inline auto& led_operational = ST_LIB::PG13;
+// inline auto& led_connecting = ST_LIB::PB0;
+// inline auto& led_fault = ST_LIB::PB14;
+// inline auto& led_operational = ST_LIB::PE1;
 
 // ============================================
 // CAN

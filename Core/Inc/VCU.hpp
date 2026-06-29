@@ -120,6 +120,13 @@ inline void init() {
         required_peers_connected
 #endif
     );
+#ifndef SINGLE
+    new HeapPacket(static_cast<uint16_t>(941), &hvbms_state);
+    new HeapPacket(static_cast<uint16_t>(64), &pcu_state);
+    new HeapPacket(static_cast<uint16_t>(63), &lcu_vertical_state, &lcu_horizontal_state);
+    DataPackets::Remote_States_init(hvbms_state, pcu_state, lcu_vertical_state, lcu_horizontal_state);
+    DataPackets::VCU_State_For_PCU_init(recovery_status);
+#endif
     OrderPackets::FAULT_init();
     OrderPackets::Cooling_pump_power_init(cooling_pump_duty, cooling_pump_selection);
     OrderPackets::MANTEINANCE_init();
@@ -171,6 +178,8 @@ inline void init() {
 
     OrderPackets::start();
     DataPackets::start();
+
+    Diagnostics::install_ethernet_sink(OrderPackets::control_station_tcp);
 
     VCU_StateMachine::start();
 }
