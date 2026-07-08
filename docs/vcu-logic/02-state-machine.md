@@ -53,6 +53,9 @@ socket and state packet are defined.
 | `Ready` | `StaticLevitation` | `Static levitation` order. |
 | `Ready` | `DynamicLevitation` | `Dynamic levitation` order. |
 | `StaticLevitation` | `DynamicLevitation` | `Dynamic levitation` order. |
+| `Propulsion` | `HVActive` | `Brake` order. Brakes and keeps contactors closed. |
+| `StaticLevitation` | `HVActive` | `Brake` order. Brakes and keeps contactors closed. |
+| `DynamicLevitation` | `HVActive` | `Brake` order. Brakes and keeps contactors closed. |
 | `Propulsion` | `Connected` | `Stop` order. |
 | `StaticLevitation` | `Connected` | `Stop` order. |
 | `DynamicLevitation` | `Connected` | `Stop` order. |
@@ -64,6 +67,10 @@ The `Stop` exits from `Propulsion`, `StaticLevitation`, and
 - exiting `Propulsion` stops propelling;
 - exiting `StaticLevitation` stops levitating;
 - exiting `DynamicLevitation` stops propelling and levitating.
+
+The `Brake` exits from those same active modes run the same active-mode exit
+actions and engage the brake, but transition to `HVActive` without opening
+contactors.
 
 ## Active-Mode Orders
 

@@ -404,6 +404,30 @@ transitions:
     priority: 10
 
   - from: PROPULSION
+    event: ORDER_BRAKE
+    to: HV_ACTIVE
+    actions:
+      - brake
+    priority: 10
+    description: Brakes while keeping contactors closed; active-mode on_exit stops propulsion.
+
+  - from: STATIC_LEVITATION
+    event: ORDER_BRAKE
+    to: HV_ACTIVE
+    actions:
+      - brake
+    priority: 10
+    description: Brakes while keeping contactors closed; active-mode on_exit stops levitation.
+
+  - from: DYNAMIC_LEVITATION
+    event: ORDER_BRAKE
+    to: HV_ACTIVE
+    actions:
+      - brake
+    priority: 10
+    description: Brakes while keeping contactors closed; active-mode on_exit stops propulsion and levitation.
+
+  - from: PROPULSION
     event: ORDER_STOP
     to: CONNECTED
     priority: 10

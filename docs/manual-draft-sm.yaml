@@ -21,7 +21,12 @@ Transitions:
     STATIC_LEVITATION: when an specific order arrives: STATIC_LEVITATION
     DYNAMIC_LEVITATION: when an specific order arrives: DYNAMIC_LEVITATION
   STATIC_LEVITATION: 
+    HV_ACTIVE: when an specific order arrives: BRAKE, braking but keeping contactors closed
     DYNAMIC_LEVITATION: when an specific order arrives: DYNAMIC_LEVITATION
+  PROPULSION:
+    HV_ACTIVE: when an specific order arrives: BRAKE, braking but keeping contactors closed
+  DYNAMIC_LEVITATION:
+    HV_ACTIVE: when an specific order arrives: BRAKE, braking but keeping contactors closed
   *:
     FAULT: when any protection gets triggered, when we reach the tapes, or when we got disconnected from the control station
     WARNING: when high pressure is less than 50 bar

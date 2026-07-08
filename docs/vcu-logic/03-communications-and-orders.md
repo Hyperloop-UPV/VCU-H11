@@ -45,7 +45,7 @@ This split is important: packet callbacks should stay short and should not bypas
 | `Propulsion` | 38 | `Ready -> Propulsion`. |
 | `Static levitation` | 39 | `Ready -> StaticLevitation`. |
 | `Dynamic levitation` | 40 | `Ready` or `StaticLevitation -> DynamicLevitation`. |
-| `Brake` | 43 | `Ready -> HVActive` and engages brakes. |
+| `Brake` | 43 | `Ready`, `Propulsion`, `StaticLevitation`, or `DynamicLevitation -> HVActive`; engages brakes and keeps contactors closed. |
 | `Unbrake` | 52 | `HVActive -> Ready` and releases brakes through `Ready` entry. |
 | `Emergency stop` | 55 | Enters `Fault` and propagates fault handling. |
 
@@ -91,7 +91,7 @@ The main telemetry send path transmits local VCU telemetry to the control statio
 | MANTEINANCE, Precharge | `Connected`. |
 | Stop | `Manteinance`, `Precharging`, `HVActive`, `Ready`, `Propulsion`, `StaticLevitation`, `DynamicLevitation`. |
 | Unbrake | `HVActive`. |
-| Brake | `Ready`. |
+| Brake | `Ready`, `Propulsion`, `StaticLevitation`, `DynamicLevitation`. |
 | Propulsion, Static levitation, Dynamic levitation | `Ready`; dynamic levitation is also accepted from `StaticLevitation`. |
 | Propulsion-specific low-level orders | `Propulsion`, `DynamicLevitation`. |
 | Levitation-specific low-level orders | `StaticLevitation`, `DynamicLevitation`. |

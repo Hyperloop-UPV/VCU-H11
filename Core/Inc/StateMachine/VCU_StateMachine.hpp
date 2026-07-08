@@ -22,10 +22,6 @@ inline bool is_fault_state() {
     return is_state(VCU::OperationalState::Fault) || FaultController::is_faulted();
 }
 
-inline void open_sdc() {
-    // H11 currently exposes SDC as an input/protection, not as a controllable output.
-}
-
 inline void sample_inputs() {
     VCU::high_pressure_sensor.read();
     VCU::low_pressure_sensor.read();
@@ -292,7 +288,6 @@ inline void enter_state(VCU::OperationalState state) {
         start_dynamic_levitation();
         break;
     case VCU::OperationalState::Fault:
-        open_sdc();
         if (VCU::led_fault != nullptr) {
             VCU::led_fault->turn_on();
         }
@@ -585,6 +580,24 @@ inline void handle_ready_orders() {
     }
 }
 
+inline void handle_active_mode_brake_order() {
+    switch (VCU::operational_state) {
+    case VCU::OperationalState::Propulsion:
+    case VCU::OperationalState::StaticLevitation:
+    case VCU::OperationalState::DynamicLevitation:
+        break;
+    default:
+        return;
+    }
+
+    if (OrderPackets::Brake_flag) {
+        OrderPackets::Brake_flag = false;
+        if (transition_pending) return;
+        VCU::engage_brake();
+        transition_to(VCU::OperationalState::HVActive);
+    }
+}
+
 inline void handle_static_levitation_orders() {
     if (!is_state(VCU::OperationalState::StaticLevitation)) {
         return;
@@ -685,7 +698,7 @@ inline void clear_stale_order_flags() {
         reject_order(OrderPackets::Unbrake_flag, "Unbrake order rejected: not in HVActive state");
     }
     if (OrderPackets::Brake_flag) {
-        reject_order(OrderPackets::Brake_flag, "Brake order rejected: not in Ready state");
+        reject_order(OrderPackets::Brake_flag, "Brake order rejected: not in Ready or active movement state");
     }
     if (OrderPackets::Propulsion_flag) {
         reject_order(OrderPackets::Propulsion_flag, "Propulsion order rejected: not in Ready state");
@@ -725,6 +738,7 @@ inline void handle_orders() {
     handle_precharging();
     handle_hv_active_orders();
     handle_ready_orders();
+    handle_active_mode_brake_order();
     handle_static_levitation_orders();
     handle_propulsion_orders();
     handle_levitation_orders();

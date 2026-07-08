@@ -40,6 +40,10 @@ stateDiagram-v2
 
     STATIC_LEVITATION --> DYNAMIC_LEVITATION: ORDER_DYNAMIC_LEVITATION
 
+    PROPULSION --> HV_ACTIVE: ORDER_BRAKE\nbrake, keep contactors closed
+    STATIC_LEVITATION --> HV_ACTIVE: ORDER_BRAKE\nbrake, keep contactors closed
+    DYNAMIC_LEVITATION --> HV_ACTIVE: ORDER_BRAKE\nbrake, keep contactors closed
+
     PROPULSION --> CONNECTED: ORDER_STOP\nstop propelling
     STATIC_LEVITATION --> CONNECTED: ORDER_STOP\nstop levitating
     DYNAMIC_LEVITATION --> CONNECTED: ORDER_STOP\nstop propelling + levitating
