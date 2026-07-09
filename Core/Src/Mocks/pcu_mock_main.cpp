@@ -34,9 +34,7 @@ inline bool was_connected_to_master = false;
 inline PCU_State pcu_state = PCU_State::IDLE;
 inline float dummy_svpwm_params[4] = {};
 
-inline HeapPacket* connection_status_packet = nullptr;
 inline HeapPacket* state_packet = nullptr;
-inline DatagramSocket* mock_control_station_udp = nullptr;
 inline DatagramSocket* state_udp = nullptr;
 
 #ifndef MOCK_NO_LEDS
@@ -75,23 +73,14 @@ inline void init() {
         pcu_state = PCU_State::IDLE;
     });
 
-    connection_status_packet = new HeapPacket(
-        static_cast<uint16_t>(1101), &connected_to_master
-    );
     state_packet = new HeapPacket(
         static_cast<uint16_t>(553), &pcu_state
     );
 
-    mock_control_station_udp = new DatagramSocket(
-        "192.168.1.5", 50400, "192.168.0.9", 50400
-    );
     state_udp = new DatagramSocket(
         "192.168.1.5", 50402, "192.168.1.3", 50402
     );
 
-    Scheduler::register_task(100'000, +[]() {
-        mock_control_station_udp->send_packet(*connection_status_packet);
-    });
     Scheduler::register_task(16'670, +[]() {
         state_udp->send_packet(*state_packet);
     });
