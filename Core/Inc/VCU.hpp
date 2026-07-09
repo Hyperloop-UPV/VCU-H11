@@ -104,6 +104,10 @@ inline void init() {
     OrderPackets::Unbrake_init();
     OrderPackets::Open_Contactors_init();
 
+    OrderPackets::Propulsion_Parameterized_init(RemoteBoards::propulsion_target_speed, RemoteBoards::propulsion_max_current);
+    OrderPackets::Static_Levitation_Parameterized_init(RemoteBoards::levitation_target_height);
+    OrderPackets::Dynamic_Levitation_Parameterized_init(RemoteBoards::propulsion_target_speed, RemoteBoards::propulsion_max_current, RemoteBoards::levitation_target_height);
+
     RemoteBoards::init_remote_orders();
 
     OrderPackets::start();

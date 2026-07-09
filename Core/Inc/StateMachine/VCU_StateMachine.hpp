@@ -536,37 +536,76 @@ inline void handle_ready_orders() {
         return;
     }
 
-    if (OrderPackets::Propulsion_flag) {
+    if (OrderPackets::Propulsion_flag || OrderPackets::Propulsion_Parameterized_flag) {
         OrderPackets::Propulsion_flag = false;
+        OrderPackets::Propulsion_Parameterized_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
+        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Propulsion);
 #else
         start_propulsion();
+        RemoteBoards::reset_control_params();
         start_confirmed_transition(DataPackets::state::Propulsion);
 #endif
         return;
     }
 
-    if (OrderPackets::Static_Levitation_flag) {
+    if (OrderPackets::Static_Levitation_flag || OrderPackets::Static_Levitation_Parameterized_flag) {
         OrderPackets::Static_Levitation_flag = false;
+        OrderPackets::Static_Levitation_Parameterized_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
+        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Static_Levitation);
 #else
         start_static_levitation();
+        RemoteBoards::reset_control_params();
         start_confirmed_transition(DataPackets::state::Static_Levitation);
 #endif
         return;
     }
 
-    if (OrderPackets::Dynamic_Levitation_flag) {
+    if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
+        OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
+        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Dynamic_Levitation);
 #else
         start_dynamic_levitation();
+        RemoteBoards::reset_control_params();
+        start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
+#endif
+        return;
+    }
+
+    if (OrderPackets::Static_Levitation_flag || OrderPackets::Static_Levitation_Parameterized_flag) {
+        OrderPackets::Static_Levitation_flag = false;
+        OrderPackets::Static_Levitation_Parameterized_flag = false;
+        if (transition_pending) return;
+#ifdef SINGLE
+        RemoteBoards::levitation_target_height = 0.0f;
+        transition_to(DataPackets::state::Static_Levitation);
+#else
+        start_static_levitation();
+        RemoteBoards::levitation_target_height = 0.0f;
+        start_confirmed_transition(DataPackets::state::Static_Levitation);
+#endif
+        return;
+    }
+
+    if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
+        OrderPackets::Dynamic_Levitation_flag = false;
+        OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
+        if (transition_pending) return;
+#ifdef SINGLE
+        RemoteBoards::reset_control_params();
+        transition_to(DataPackets::state::Dynamic_Levitation);
+#else
+        start_propulsion();
+        RemoteBoards::reset_control_params();
         start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
 #endif
         return;
@@ -596,13 +635,20 @@ inline void handle_static_levitation_orders() {
         return;
     }
 
-    if (OrderPackets::Dynamic_Levitation_flag) {
+    if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
+        OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
+        RemoteBoards::propulsion_target_speed = 0.0f;
+        RemoteBoards::propulsion_max_current = 0.0f;
+        RemoteBoards::levitation_target_height = 0.0f;
         transition_to(DataPackets::state::Dynamic_Levitation);
 #else
         start_propulsion();
+        RemoteBoards::propulsion_target_speed = 0.0f;
+        RemoteBoards::propulsion_max_current = 0.0f;
+        RemoteBoards::levitation_target_height = 0.0f;
         start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
 #endif
         return;
@@ -625,11 +671,20 @@ inline void clear_stale_order_flags() {
     if (OrderPackets::Propulsion_flag) {
         reject_order(OrderPackets::Propulsion_flag, "Propulsion order rejected: not in Ready state");
     }
+    if (OrderPackets::Propulsion_Parameterized_flag) {
+        reject_order(OrderPackets::Propulsion_Parameterized_flag, "Propulsion order rejected: not in Ready state");
+    }
     if (OrderPackets::Static_Levitation_flag) {
         reject_order(OrderPackets::Static_Levitation_flag, "Static levitation order rejected: not in Ready state");
     }
+    if (OrderPackets::Static_Levitation_Parameterized_flag) {
+        reject_order(OrderPackets::Static_Levitation_Parameterized_flag, "Static levitation order rejected: not in Ready state");
+    }
     if (OrderPackets::Dynamic_Levitation_flag) {
         reject_order(OrderPackets::Dynamic_Levitation_flag, "Dynamic levitation order rejected: not in Ready or Static_Levitation state");
+    }
+    if (OrderPackets::Dynamic_Levitation_Parameterized_flag) {
+        reject_order(OrderPackets::Dynamic_Levitation_Parameterized_flag, "Dynamic levitation order rejected: not in Ready or Static_Levitation state");
     }
     if (OrderPackets::Open_Contactors_flag) {
         reject_order(OrderPackets::Open_Contactors_flag, "Open contactors order rejected: not in commandable state");
