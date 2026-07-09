@@ -1,4 +1,3 @@
-#include "Communications/Packets/DataPackets.hpp"
 #include "Mocks/MockPeer.hpp"
 #include "ST-LIB.hpp"
 #include "main.h"
@@ -16,6 +15,13 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
 
 using Board = MockPeer::Board<eth>;
 
+enum class PCU_State : uint8_t {
+    Connecting = 0,
+    IDLE = 1,
+    Accelerating = 2,
+    Fault = 3,
+};
+
 inline ST_LIB::EthernetDomain::Instance* ethernet = nullptr;
 #ifndef MOCK_NO_LEDS
 inline ST_LIB::DigitalOutputDomain::Instance* status_led = nullptr;
@@ -25,8 +31,13 @@ inline ServerSocket* vcu_socket = nullptr;
 inline bool connected_to_master = false;
 inline bool was_connected_to_master = false;
 
-inline DataPackets::pcu_state pcu_state = DataPackets::pcu_state::Stopped;
-inline uint8_t dummy_run_id = 0;
+inline PCU_State pcu_state = PCU_State::IDLE;
+inline float dummy_svpwm_params[4] = {};
+
+inline HeapPacket* connection_status_packet = nullptr;
+inline HeapPacket* state_packet = nullptr;
+inline DatagramSocket* mock_control_station_udp = nullptr;
+inline DatagramSocket* state_udp = nullptr;
 
 #ifndef MOCK_NO_LEDS
 inline void update_leds() {
@@ -51,19 +62,40 @@ inline void init() {
 
     Diagnostics::install_ethernet_sink(vcu_socket);
 
-    new HeapOrder(56, +[]() {
-        pcu_state = DataPackets::pcu_state::Propulsion;
-    }, &dummy_run_id);
-    new HeapOrder(58, +[]() {
-        pcu_state = DataPackets::pcu_state::Stopped;
-    });
-    new HeapOrder(0, +[]() {
-        pcu_state = DataPackets::pcu_state::Stopped;
+    new HeapOrder(
+        507, +[]() {
+            pcu_state = PCU_State::Accelerating;
+        },
+        &dummy_svpwm_params[0],
+        &dummy_svpwm_params[1],
+        &dummy_svpwm_params[2],
+        &dummy_svpwm_params[3]
+    );
+    new HeapOrder(508, +[]() {
+        pcu_state = PCU_State::IDLE;
     });
 
-    DataPackets::PCU_Mock_Connection_Status_init(connected_to_master);
-    DataPackets::PCU_State_init(pcu_state);
-    DataPackets::start();
+    connection_status_packet = new HeapPacket(
+        static_cast<uint16_t>(1101), &connected_to_master
+    );
+    state_packet = new HeapPacket(
+        static_cast<uint16_t>(553), &pcu_state
+    );
+
+    mock_control_station_udp = new DatagramSocket(
+        "192.168.1.5", 50400, "192.168.0.9", 50400
+    );
+    state_udp = new DatagramSocket(
+        "192.168.1.5", 50402, "192.168.1.3", 50402
+    );
+
+    Scheduler::register_task(100'000, +[]() {
+        mock_control_station_udp->send_packet(*connection_status_packet);
+    });
+    Scheduler::register_task(16'670, +[]() {
+        state_udp->send_packet(*state_packet);
+    });
+
 #ifndef MOCK_NO_LEDS
     Scheduler::register_task(200'000, +[]() { update_leds(); });
 #endif

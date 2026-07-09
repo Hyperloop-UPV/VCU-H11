@@ -22,14 +22,15 @@ Stable H10 behavior to preserve in H11 intent:
 
 Current H11 product state machine:
 
-- The explicit VCU states are `Idle`, `Connected`, `Manteinance`, `Precharging`, `HVActive`, `Ready`, `Propulsion`, `StaticLevitation`, `DynamicLevitation`, and `Fault`.
-- `Idle` transitions to `Connected` only when the control station and required boards are connected. The current required peers are control station, HVBMS, and LCU. PCU connectivity is still tracked but temporarily does not gate `Idle -> Connected` while bench testing with only two Nucleo mock boards.
-- `Connected` accepts high-level `MANTEINANCE` and `Precharge` orders. `Stop` returns commandable non-idle modes to `Connected`.
+- The explicit VCU states are `Idle`, `Connected`, `Maintenance`, `Precharging`, `HVActive`, `Ready`, `Propulsion`, `StaticLevitation`, `DynamicLevitation`, and `Fault`.
+- `Idle` transitions to `Connected` only when the control station and required boards are connected. The current required peers are control station, HVBMS, and LCU. PCU connectivity is tracked but does not gate `Idle -> Connected`.
+- `Connected` accepts high-level `Maintenance` and `Precharge` orders. `Stop` returns commandable non-idle modes to `Connected`. `Open contactors` opens contactors and returns non-Idle modes below propulsion/levitation to `Connected`.
 - `Brake` is accepted from `Ready`, `Propulsion`, `StaticLevitation`, and `DynamicLevitation`. From active motion/levitation states it engages brakes and returns to `HVActive` while keeping contactors closed; active-mode exit actions still stop propulsion and/or levitation.
-- `Precharging` sends the formal HVBMS precharge request through the existing high-voltage remote link until a dedicated HVBMS socket/state packet is defined.
+- `Precharging` sends the HVBMS precharge request (order ID 903) through `hvbms_tcp`.
 - `Fault` is intentionally part of the current formal product state machine by explicit user request. ST-LIB protections and `FaultController` still provide the underlying fault trigger infrastructure.
-- Current protection/diagnostic policy: SDC open faults, `tapes_reached` faults, control-station disconnect faults outside `Idle`, and high pressure below 50 bar emits a warning. Brake fault is currently sampled and published but temporarily does not fault the VCU while `DISABLE_BRAKE_FAULT_PROTECTION` is enabled for bench testing.
-- `tapes_reached` is currently a formal software signal only; H11 has no tape input pin defined in `Pinout.hpp` yet.
+- Current protection/diagnostic policy: SDC open faults, control-station disconnect faults outside `Idle`, and high pressure below 50 bar emits a warning. Brake fault is currently sampled and published but temporarily does not fault the VCU while `DISABLE_BRAKE_FAULT_PROTECTION` is enabled for bench testing.
+- `tapes_reached` protection and ADJ measurement removed entirely (no tape input pin on H11).
+- Flow sensors and NTC temperature sensors are not used in current firmware; their telemetry packets and sampling were removed from this version.
 
 ## Current Firmware Shape
 
@@ -37,17 +38,24 @@ Current H11 product state machine:
 - Main VCU facade: `Core/Inc/VCU.hpp`.
 - Device requests, global runtime pointers, and app state: `Core/Inc/VCU_TYPES.hpp`.
 - State machine skeleton: `Core/Inc/StateMachine/VCU_StateMachine.hpp`.
+- Manual remote-board enum/order definitions: `Core/Inc/Communications/RemoteBoards.hpp`.
 - Declarative operational FSM spec: `docs/vcu_state_machine.yaml`.
 - Hardware pin aliases: `Core/Inc/Pinout/Pinout.hpp`.
 - Packet schemas: `Core/Inc/Code_generation/JSON_ADE/boards/VCU/`.
 
 Generated Ethernet comms bind the control-station UDP telemetry socket plus PCU, HVBMS, and LCU UDP sockets. The remote UDP sockets are needed because incoming state packets update the global `HeapPacket` values that the VCU uses for acknowledgement tracking.
 
-Current VCU generated TCP sockets are control station, PCU, HVBMS, and LCU. Do
-not keep an unused BCU TCP socket in the VCU generated socket list: each ST-LIB
-TCP socket reserves an 8192-byte receive stream buffer, and the extra BCU socket
-caused `std::bad_alloc` during `OrderPackets::start()` before the main loop
-could service Ethernet.
+The VCU ADJ defines only the control-station-facing orders and telemetry packets. Remote-board orders (to PCU, LCU, HVBMS) and incoming remote-board state packets are manually defined in `Core/Inc/Communications/RemoteBoards.hpp`. The auto-generated `OrderPackets` class from ADJ does not contain remote-board forwarding orders; the state machine uses `RemoteBoards::Start_SVPWM_to_pcu_order`, `RemoteBoards::Levitate_to_lcu_order`, etc. via the generated TCP sockets (`OrderPackets::pcu_tcp`, `OrderPackets::lcu_tcp`, `OrderPackets::hvbms_tcp`).
+
+Remote board state enums are manually defined to match each remote board's ADJ measurements:
+- HVBMS: `HVBMS_SM_State` (IDLE, READY_TO_PRECHARGE, PRECHARGING, ENERGIZED, FAULT) via packet ID 960
+- PCU: `PCU_State` (Connecting, IDLE, Accelerating, Fault) via packet ID 553
+- LCU: `LCU_Master_SM_State` (Connecting, Idle, Levitating, Current_Control, Debug, Fault) via packet ID 9520
+
+VCU remote orders sent (defined in `RemoteBoards.hpp`):
+- To HVBMS: FAULT (0), start_precharge (903), open_contactors (901)
+- To PCU: Start_SVPWM (507), Stop_Motor (508)
+- To LCU: Levitate (9010), Stop (9000)
 
 ST-LIB TCP client sockets can be constructed before the Ethernet link has a
 route to the remote board. Initial `tcp_connect()` failures such as lwIP
@@ -82,37 +90,13 @@ precharge completion is simulated locally by marking contactors closed.
 The build also supports simple Ethernet mock peer entry points selected with the
 `VCU_APP_TARGET` CMake cache variable. `master` builds the normal VCU main,
 `hvbms_mock` builds a Nucleo mock with IP `192.168.1.7`, and `lcu_mock` builds a
-Nucleo mock with IP `192.168.1.4`. The mock build presets set `BOARD_NAME` to
-the matching mock ADJ board so generated packets/sockets match the mock target.
-The current mock firmwares initialize Ethernet, create a VCU-facing
-`ServerSocket` directly in firmware on port `50500`, initialize the generated
-mock connection-status data packet with `connected_to_master`, and publish that
-status over UDP while the VCU connects to the mock server. On the Nucleo mock
-boards, the `PB0` LED blinks while waiting for the first VCU connection, stays
-on while connected, and turns off if the VCU disconnects after having connected;
-the red Nucleo LED on `PB14` turns on for that post-connection disconnect.
-Mock server sockets recreate their listener after ST-LIB reports the accepted
-connection is no longer connected, so the mock can accept the master again
-after a loss. For bench feedback, the mock `ServerSocket`s use ST-LIB TCP
-keepalive with a short timeout. ST-LIB server sockets should stop reporting
-connected once lwIP leaves an established state or exhausts keepalive probes;
-the ST-LIB server poll path actively sends TCP keepalive probes so silent server
-connections do not remain accepted indefinitely. The VCU-facing mock TCP server
-is intentionally not declared in ADJ, because the control station should only
-open TCP connections to the VCU/master. Generated packet headers are shared
-source-tree files, so the CMake `run_generator` target is intentionally always
-run before firmware compilation with the currently configured `BOARD_NAME`;
-otherwise a mock build can accidentally compile against stale VCU-generated
-packet headers, or the reverse.
-
-The nested ADJ repository has a `vcu-packets-mock` branch based on
-`vcu-packets`. It adds two mock boards, `HVBMSMOCK` at `192.168.1.7` and
-`LCUMOCK` at `192.168.1.4`, each with a single boolean
-`connected_to_master` data packet for bench mock status. For bench visibility
-only, the mock connection-status packets are assigned to unique mock UDP sockets
-(`hvbms_mock_control_station_udp` and `lcu_mock_control_station_udp`) and sent
-to the control-station backend at `192.168.0.9:50400` every 100 ms, even though
-the real remote boards will communicate only with the VCU.
+Nucleo mock with IP `192.168.1.4`. The mock firmwares now use manually defined
+state enums and orders (matching the remote board ADJ definitions) since the mock
+ADJ boards were removed in the final ADJ version. Mocks receive orders matching
+the current remote-board order IDs (e.g., HVBMS mock receives precharge on 903,
+open contactors on 901; PCU mock receives Start_SVPWM on 507, Stop_Motor on 508;
+LCU mock receives Levitate on 9010, Stop on 9000). Mock state packets (960, 553,
+9520) are sent to the VCU over the same packet IDs the real boards use.
 
 ADJ measurements that represent VCU state-machine states should keep their
 numeric wire type, currently `uint8`, and add `enumValues` in numeric order so
@@ -297,11 +281,9 @@ These need confirmation before implementing more runtime behavior:
 
 - Active level and safe default for every output.
 - Pull-up/pull-down requirements for digital inputs.
-- Sensor calibration and units for pressure, flow, and NTC temperature.
+- Sensor calibration and units for pressure.
 - Protection thresholds and diagnostic IDs.
 - Whether brake fault should remain a polled protection only or also become EXTI-triggered.
-- Exact flow-sensor abstraction. ST-LIB currently provides TIM23 input-capture support, but no dedicated flow/pulse sensor wrapper has been selected.
-- Final pressure, flow, and temperature packet units once calibration is defined.
 
 ## Maintenance Protocol
 

@@ -3,6 +3,7 @@
 
 #include "Communications/Packets/DataPackets.hpp"
 #include "Communications/Packets/OrderPackets.hpp"
+#include "Communications/RemoteBoards.hpp"
 #include "ST-LIB.hpp"
 #include "StateMachine/VCU_StateMachine.hpp"
 #include "VCU_TYPES.hpp"
@@ -23,20 +24,17 @@ using Board = ST_LIB::Board<
     electrovalve_req,
     brake_reset_req,
     brake_fault_req,
-    sdmmc_card_detect_req,
-    sdmmc_write_protect_req,
     sdc_closed_req,
     high_pressure_adc_req,
     low_pressure_adc_req,
     pressure_regulator_out_adc_req,
     ntc_temperature_1_adc_req,
     ntc_temperature_2_adc_req,
-    flow_timer_req,
-    sdc_closed_protection,
 #ifndef DISABLE_BRAKE_FAULT_PROTECTION
     brake_fault_protection,
 #endif
-    tapes_reached_protection>;
+    sdc_closed_protection
+>;
 
 inline void init() {
     Board::init();
@@ -54,8 +52,6 @@ inline void init() {
     electrovalve = &Board::instance_of<electrovalve_req>();
     brake_reset = &Board::instance_of<brake_reset_req>();
     brake_fault = &Board::instance_of<brake_fault_req>();
-    sdmmc_card_detect = &Board::instance_of<sdmmc_card_detect_req>();
-    sdmmc_write_protect = &Board::instance_of<sdmmc_write_protect_req>();
     sdc_closed_interrupt = &Board::instance_of<sdc_closed_req>();
 
     high_pressure_sensor = LinearSensor<float>(
@@ -76,13 +72,11 @@ inline void init() {
         uncalibrated_linear_offset,
         pressure_regulator_out
     );
+    sdc_closed_sensor = SensorInterrupt(*sdc_closed_interrupt, sdc_closed_state);
     ntc_temperature_1_sensor =
         NTC(Board::instance_of<ntc_temperature_1_adc_req>(), ntc_temperature_1);
     ntc_temperature_2_sensor =
         NTC(Board::instance_of<ntc_temperature_2_adc_req>(), ntc_temperature_2);
-    sdc_closed_sensor = SensorInterrupt(*sdc_closed_interrupt, sdc_closed_state);
-    flow_timer = ST_LIB::TimerWrapper<flow_timer_req>(&Board::instance_of<flow_timer_req>());
-    configure_flow_input_captures();
 
     sdc_closed_interrupt->turn_on();
     led_operational->turn_off();
@@ -91,90 +85,26 @@ inline void init() {
     led_connecting->turn_off();
     led_fault->turn_off();
 
-    DataPackets::VCU_State_init(
-        general_state,
-        operational_state_id,
-        recovery_status,
-        demonstration_bitfield
-    );
-    DataPackets::Flow_init(flow_1, flow_2);
-    DataPackets::Temperatures_init(ntc_temperature_1, ntc_temperature_2);
+    DataPackets::VCU_State_init(operational_state);
     DataPackets::Pressures_init(high_pressure, low_pressure, pressure_regulator_out);
     DataPackets::Brake_Status_init(active_brakes, brake_fault_detected);
-    DataPackets::Outputs_init(
-        cooling_pump_1_command,
-        cooling_pump_2_command,
-        electrovalve_enabled
-    );
-    DataPackets::Safety_init(
-        sdc_closed,
-        tapes_reached,
-        contactors_closed,
-        control_station_connected,
-#ifdef SINGLE
-        required_peers_connected
-#else
-        hvbms_connected,
-        pcu_connected,
-        lcu_connected,
-        required_peers_connected
-#endif
-    );
-#ifndef SINGLE
-    new HeapPacket(static_cast<uint16_t>(941), &hvbms_state);
-    new HeapPacket(static_cast<uint16_t>(64), &pcu_state);
-    new HeapPacket(static_cast<uint16_t>(63), &lcu_vertical_state, &lcu_horizontal_state);
-    DataPackets::Remote_States_init(hvbms_state, pcu_state, lcu_vertical_state, lcu_horizontal_state);
-    DataPackets::VCU_State_For_PCU_init(recovery_status);
-#endif
+    DataPackets::Outputs_init(electrovalve_enabled);
+    DataPackets::Safety_init(sdc_closed, hvbms_connected, pcu_connected, lcu_connected);
+
+    RemoteBoards::init_remote_state_receivers();
+
     OrderPackets::FAULT_init();
-    OrderPackets::Cooling_pump_power_init(cooling_pump_duty, cooling_pump_selection);
-    OrderPackets::MANTEINANCE_init();
+    OrderPackets::Maintenance_init();
     OrderPackets::Precharge_init();
     OrderPackets::Stop_init();
     OrderPackets::Propulsion_init();
-    OrderPackets::Static_levitation_init();
-    OrderPackets::Dynamic_levitation_init();
+    OrderPackets::Static_Levitation_init();
+    OrderPackets::Dynamic_Levitation_init();
     OrderPackets::Brake_init();
-#ifndef SINGLE
-    OrderPackets::Recovery_init();
-    OrderPackets::Close_contactors_init();
-#endif
     OrderPackets::Unbrake_init();
-#ifndef SINGLE
-    OrderPackets::Open_contactors_init();
-#endif
-    OrderPackets::Emergency_stop_init();
-#ifndef SINGLE
-    OrderPackets::Runs_init(run_id);
-    OrderPackets::SVPWM_init(
-        modulation_frequency_1,
-        commutation_frequency_1,
-        reference_voltage_1,
-        max_voltage_1,
-        motor_direction_1
-    );
-    OrderPackets::Stop_motor_init();
-    OrderPackets::Current_control_init(
-        modulation_frequency_2,
-        commutation_frequency_2,
-        reference_current_2,
-        max_voltage_2,
-        motor_direction_2
-    );
-    OrderPackets::Speed_control_init(
-        reference_speed_3,
-        commutation_frequency_3,
-        max_voltage_3,
-        motor_direction_3
-    );
-    OrderPackets::Motor_brake_init();
-    OrderPackets::Levitation_init(levitation_distance);
-    OrderPackets::Stop_levitation_init();
-    OrderPackets::Booster_init();
-    OrderPackets::Stop_booster_init();
-    OrderPackets::Forward_booster_init();
-#endif
+    OrderPackets::Open_Contactors_init();
+
+    RemoteBoards::init_remote_orders();
 
     OrderPackets::start();
     DataPackets::start();

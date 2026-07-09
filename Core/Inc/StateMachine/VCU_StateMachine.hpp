@@ -2,6 +2,7 @@
 #define VCU_STATE_MACHINE_HPP
 
 #include "Communications/Packets/OrderPackets.hpp"
+#include "Communications/RemoteBoards.hpp"
 #include "VCU_TYPES.hpp"
 
 namespace VCU_StateMachine {
@@ -12,40 +13,29 @@ inline void transition_to_fault(const char* reason);
 
 inline bool transition_pending = false;
 inline uint16_t pending_timeout_task_id = 0;
-inline VCU::OperationalState pending_transition_target = VCU::OperationalState::Idle;
+inline DataPackets::state pending_transition_target = DataPackets::state::Idle;
 
-inline bool is_state(VCU::OperationalState state) {
+inline bool is_state(DataPackets::state state) {
     return VCU::operational_state == state;
 }
 
 inline bool is_fault_state() {
-    return is_state(VCU::OperationalState::Fault) || FaultController::is_faulted();
+    return is_state(DataPackets::state::Fault) || FaultController::is_faulted();
 }
 
 inline void sample_inputs() {
     VCU::high_pressure_sensor.read();
     VCU::low_pressure_sensor.read();
     VCU::pressure_regulator_out_sensor.read();
-    VCU::ntc_temperature_1_sensor.read();
-    VCU::ntc_temperature_2_sensor.read();
     VCU::sdc_closed_sensor.read();
 
-    VCU::flow_1 = static_cast<float>(
-        VCU::read_flow_capture_frequency<ST_LIB::TimerChannel::CHANNEL_1>()
-    );
-    VCU::flow_2 = static_cast<float>(
-        VCU::read_flow_capture_frequency<ST_LIB::TimerChannel::CHANNEL_2>()
-    );
+    VCU::ntc_temperature_1_sensor.read();
+    VCU::ntc_temperature_2_sensor.read();
+
     VCU::sdc_closed = VCU::sdc_closed_state == GPIO_PIN_SET;
 
     if (VCU::brake_fault != nullptr) {
         VCU::brake_fault_detected = VCU::brake_fault->read() == GPIO_PIN_SET;
-    }
-    if (VCU::sdmmc_card_detect != nullptr) {
-        VCU::sdmmc_card_detected = VCU::sdmmc_card_detect->read() == GPIO_PIN_SET;
-    }
-    if (VCU::sdmmc_write_protect != nullptr) {
-        VCU::sdmmc_write_protected = VCU::sdmmc_write_protect->read() == GPIO_PIN_SET;
     }
 }
 
@@ -110,8 +100,8 @@ inline void request_open_contactors() {
     VCU::contactors_closed = false;
 #else
     if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected() &&
-        OrderPackets::Open_contactors_order != nullptr) {
-        OrderPackets::hvbms_tcp->send_order(*OrderPackets::Open_contactors_order);
+        RemoteBoards::Open_contactors_to_hvbms_order != nullptr) {
+        OrderPackets::hvbms_tcp->send_order(*RemoteBoards::Open_contactors_to_hvbms_order);
     }
     VCU::contactors_closed = false;
 #endif
@@ -123,7 +113,7 @@ inline void request_precharge() {
 #else
     send_remote_order(
         OrderPackets::hvbms_tcp,
-        OrderPackets::Precharge_order,
+        RemoteBoards::Precharge_to_hvbms_order,
         "precharge"
     );
 #endif
@@ -133,7 +123,7 @@ inline void stop_propulsion() {
 #ifndef SINGLE
     send_remote_order(
         OrderPackets::pcu_tcp,
-        OrderPackets::Stop_motor_order,
+        RemoteBoards::Stop_Motor_to_pcu_order,
         "stop propulsion"
     );
 #endif
@@ -143,7 +133,7 @@ inline void stop_levitation() {
 #ifndef SINGLE
     send_remote_order(
         OrderPackets::lcu_tcp,
-        OrderPackets::Stop_levitation_order,
+        RemoteBoards::Stop_to_lcu_order,
         "stop levitation"
     );
 #endif
@@ -151,7 +141,11 @@ inline void stop_levitation() {
 
 inline void start_propulsion() {
 #ifndef SINGLE
-    send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Runs_order, "propulsion");
+    send_remote_order(
+        OrderPackets::pcu_tcp,
+        RemoteBoards::Start_SVPWM_to_pcu_order,
+        "propulsion"
+    );
 #endif
 }
 
@@ -159,7 +153,7 @@ inline void start_static_levitation() {
 #ifndef SINGLE
     send_remote_order(
         OrderPackets::lcu_tcp,
-        OrderPackets::Levitation_order,
+        RemoteBoards::Levitate_to_lcu_order,
         "static levitation"
     );
 #endif
@@ -173,13 +167,13 @@ inline void start_dynamic_levitation() {
 inline void propagate_fault() {
 #ifndef SINGLE
     if (OrderPackets::pcu_tcp != nullptr && OrderPackets::pcu_tcp->is_connected()) {
-        OrderPackets::pcu_tcp->send_order(*OrderPackets::FAULT_order);
+        OrderPackets::pcu_tcp->send_order(*RemoteBoards::Stop_Motor_to_pcu_order);
     }
     if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected()) {
-        OrderPackets::hvbms_tcp->send_order(*OrderPackets::FAULT_order);
+        OrderPackets::hvbms_tcp->send_order(*RemoteBoards::FAULT_to_hvbms_order);
     }
     if (OrderPackets::lcu_tcp != nullptr && OrderPackets::lcu_tcp->is_connected()) {
-        OrderPackets::lcu_tcp->send_order(*OrderPackets::FAULT_order);
+        OrderPackets::lcu_tcp->send_order(*RemoteBoards::Stop_to_lcu_order);
     }
 #endif
 }
@@ -237,18 +231,17 @@ inline void refresh_connections() {
     if (VCU::required_peers_connected) {
         VCU::required_peers_were_connected = true;
     }
-    VCU::sync_state_telemetry();
 }
 
-inline void exit_state(VCU::OperationalState state) {
+inline void exit_state(DataPackets::state state) {
     switch (state) {
-    case VCU::OperationalState::Propulsion:
+    case DataPackets::state::Propulsion:
         stop_propulsion();
         break;
-    case VCU::OperationalState::StaticLevitation:
+    case DataPackets::state::Static_Levitation:
         stop_levitation();
         break;
-    case VCU::OperationalState::DynamicLevitation:
+    case DataPackets::state::Dynamic_Levitation:
         stop_propulsion();
         stop_levitation();
         break;
@@ -257,37 +250,37 @@ inline void exit_state(VCU::OperationalState state) {
     }
 }
 
-inline void enter_state(VCU::OperationalState state) {
+inline void enter_state(DataPackets::state state) {
     switch (state) {
-    case VCU::OperationalState::Idle:
+    case DataPackets::state::Idle:
         VCU::engage_brake();
         request_open_contactors();
         break;
-    case VCU::OperationalState::Connected:
+    case DataPackets::state::Connected:
         VCU::engage_brake();
         request_open_contactors();
         break;
-    case VCU::OperationalState::Manteinance:
+    case DataPackets::state::Maintenance:
         VCU::release_brake();
         break;
-    case VCU::OperationalState::Precharging:
+    case DataPackets::state::Precharging:
         request_precharge();
         break;
-    case VCU::OperationalState::HVActive:
+    case DataPackets::state::HVActive:
         break;
-    case VCU::OperationalState::Ready:
+    case DataPackets::state::Ready:
         VCU::release_brake();
         break;
-    case VCU::OperationalState::Propulsion:
+    case DataPackets::state::Propulsion:
         start_propulsion();
         break;
-    case VCU::OperationalState::StaticLevitation:
+    case DataPackets::state::Static_Levitation:
         start_static_levitation();
         break;
-    case VCU::OperationalState::DynamicLevitation:
+    case DataPackets::state::Dynamic_Levitation:
         start_dynamic_levitation();
         break;
-    case VCU::OperationalState::Fault:
+    case DataPackets::state::Fault:
         if (VCU::led_fault != nullptr) {
             VCU::led_fault->turn_on();
         }
@@ -296,10 +289,9 @@ inline void enter_state(VCU::OperationalState state) {
         VCU::engage_brake();
         break;
     }
-    VCU::sync_state_telemetry();
 }
 
-inline void do_transition(VCU::OperationalState next_state) {
+inline void do_transition(DataPackets::state next_state) {
     if (VCU::operational_state == next_state) return;
     const auto previous_state = VCU::operational_state;
     exit_state(previous_state);
@@ -318,24 +310,23 @@ inline void complete_pending_transition() {
     transition_pending = false;
     pending_timeout_task_id = Scheduler::INVALID_ID;
     VCU::operational_state = pending_transition_target;
-    VCU::sync_state_telemetry();
 }
 
-inline bool verify_remote_states(VCU::OperationalState target) {
+inline bool verify_remote_states(DataPackets::state target) {
     switch (target) {
-        case VCU::OperationalState::HVActive:
-            return VCU::hvbms_state == DataPackets::hvbms_state::Closed;
-        case VCU::OperationalState::Propulsion:
-            return VCU::pcu_state == DataPackets::pcu_state::Propulsion;
-        case VCU::OperationalState::StaticLevitation:
-            return VCU::lcu_vertical_state == DataPackets::lcu_vertical_state::Levitation;
-        case VCU::OperationalState::DynamicLevitation:
-            return VCU::lcu_vertical_state == DataPackets::lcu_vertical_state::Levitation
-                && VCU::pcu_state == DataPackets::pcu_state::Propulsion;
-        case VCU::OperationalState::Connected:
-            return VCU::hvbms_state == DataPackets::hvbms_state::Opened
-                && VCU::pcu_state == DataPackets::pcu_state::Stopped
-                && VCU::lcu_vertical_state == DataPackets::lcu_vertical_state::Stopped;
+        case DataPackets::state::HVActive:
+            return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Energized;
+        case DataPackets::state::Propulsion:
+            return RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
+        case DataPackets::state::Static_Levitation:
+            return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating;
+        case DataPackets::state::Dynamic_Levitation:
+            return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating
+                && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
+        case DataPackets::state::Connected:
+            return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Idle
+                && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Idle
+                && RemoteBoards::lcu_state == RemoteBoards::LCU_State::Idle;
         default:
             return true;
     }
@@ -352,7 +343,7 @@ inline void on_transition_timeout() {
     }
 }
 
-inline void start_confirmed_transition(VCU::OperationalState target) {
+inline void start_confirmed_transition(DataPackets::state target) {
     if (transition_pending) {
         cancel_pending_transition();
     }
@@ -360,7 +351,7 @@ inline void start_confirmed_transition(VCU::OperationalState target) {
     transition_pending = true;
     pending_transition_target = target;
 
-    uint32_t timeout_us = (target == VCU::OperationalState::HVActive)
+    uint32_t timeout_us = (target == DataPackets::state::HVActive)
         ? 6'000'000 : 200'000;
 
     pending_timeout_task_id = Scheduler::set_timeout(timeout_us, +[]() {
@@ -368,22 +359,22 @@ inline void start_confirmed_transition(VCU::OperationalState target) {
     });
 }
 
-inline void transition_to(VCU::OperationalState next_state) {
+inline void transition_to(DataPackets::state next_state) {
     if (VCU::operational_state == next_state) {
         return;
     }
 
     if (transition_pending) {
-        if (next_state == VCU::OperationalState::Connected ||
-            next_state == VCU::OperationalState::Fault) {
+        if (next_state == DataPackets::state::Connected ||
+            next_state == DataPackets::state::Fault) {
             cancel_pending_transition();
         } else {
             return;
         }
     }
 
-    if (next_state == VCU::OperationalState::Fault) {
-        do_transition(VCU::OperationalState::Fault);
+    if (next_state == DataPackets::state::Fault) {
+        do_transition(DataPackets::state::Fault);
         return;
     }
 
@@ -392,10 +383,10 @@ inline void transition_to(VCU::OperationalState next_state) {
 
 inline void transition_to_fault(const char* reason) {
     cancel_pending_transition();
-    if (!is_state(VCU::OperationalState::Fault)) {
+    if (!is_state(DataPackets::state::Fault)) {
         exit_state(VCU::operational_state);
-        VCU::operational_state = VCU::OperationalState::Fault;
-        enter_state(VCU::OperationalState::Fault);
+        VCU::operational_state = DataPackets::state::Fault;
+        enter_state(DataPackets::state::Fault);
     }
     if (!FaultController::is_faulted()) {
         FAULT("%s", reason);
@@ -419,21 +410,15 @@ inline void check_fault_inputs() {
     }
 #endif
 
-    if (VCU::tapes_reached) {
-        transition_to_fault("Tapes reached");
-        return;
-    }
-
     if (!VCU::sdc_closed) {
         transition_to_fault("SDC is open");
         return;
     }
-
 }
 
 inline void handle_connection_transition() {
-    if (is_state(VCU::OperationalState::Idle) && VCU::required_peers_connected) {
-        transition_to(VCU::OperationalState::Connected);
+    if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected) {
+        transition_to(DataPackets::state::Connected);
     }
 }
 
@@ -442,39 +427,27 @@ inline void handle_fault_orders() {
         OrderPackets::FAULT_flag = false;
         transition_to_fault("FAULT order received");
     }
-
-    if (OrderPackets::Emergency_stop_flag) {
-        OrderPackets::Emergency_stop_flag = false;
-        transition_to_fault("Emergency stop order received");
-    }
 }
 
 inline void handle_common_orders() {
-    if (OrderPackets::Cooling_pump_power_flag) {
-        const auto selection = static_cast<VCU::PumpSelection>(VCU::cooling_pump_selection);
-        VCU::set_cooling_pump(selection, VCU::cooling_pump_duty);
-        OrderPackets::Cooling_pump_power_flag = false;
-    }
-
     if (OrderPackets::Stop_flag) {
         OrderPackets::Stop_flag = false;
         switch (VCU::operational_state) {
-        case VCU::OperationalState::Manteinance:
-        case VCU::OperationalState::Precharging:
-        case VCU::OperationalState::HVActive:
-        case VCU::OperationalState::Ready:
-        case VCU::OperationalState::Propulsion:
-        case VCU::OperationalState::StaticLevitation:
-        case VCU::OperationalState::DynamicLevitation:
+        case DataPackets::state::Maintenance:
+        case DataPackets::state::Precharging:
+        case DataPackets::state::HVActive:
+        case DataPackets::state::Ready:
+        case DataPackets::state::Propulsion:
+        case DataPackets::state::Static_Levitation:
+        case DataPackets::state::Dynamic_Levitation:
             cancel_pending_transition();
             exit_state(VCU::operational_state);
             VCU::engage_brake();
             request_open_contactors();
 #ifdef SINGLE
-            VCU::operational_state = VCU::OperationalState::Connected;
-            VCU::sync_state_telemetry();
-#else
-            start_confirmed_transition(VCU::OperationalState::Connected);
+            VCU::operational_state = DataPackets::state::Connected;
+        #else
+            start_confirmed_transition(DataPackets::state::Connected);
 #endif
             break;
         default:
@@ -482,56 +455,76 @@ inline void handle_common_orders() {
         }
         return;
     }
+
+    if (OrderPackets::Open_Contactors_flag) {
+        OrderPackets::Open_Contactors_flag = false;
+        switch (VCU::operational_state) {
+        case DataPackets::state::Maintenance:
+        case DataPackets::state::Precharging:
+        case DataPackets::state::HVActive:
+        case DataPackets::state::Ready:
+            cancel_pending_transition();
+            exit_state(VCU::operational_state);
+            VCU::engage_brake();
+            request_open_contactors();
+            VCU::operational_state = DataPackets::state::Connected;
+                    break;
+        default:
+            WARNING("Open contactors order ignored: not in commandable state");
+            break;
+        }
+        return;
+    }
 }
 
 inline void handle_connected_orders() {
-    if (!is_state(VCU::OperationalState::Connected)) {
+    if (!is_state(DataPackets::state::Connected)) {
         return;
     }
 
-    if (OrderPackets::MANTEINANCE_flag) {
-        OrderPackets::MANTEINANCE_flag = false;
+    if (OrderPackets::Maintenance_flag) {
+        OrderPackets::Maintenance_flag = false;
         if (transition_pending) return;
-        transition_to(VCU::OperationalState::Manteinance);
+        transition_to(DataPackets::state::Maintenance);
         return;
     }
 
     if (OrderPackets::Precharge_flag) {
         OrderPackets::Precharge_flag = false;
         if (transition_pending) return;
-        transition_to(VCU::OperationalState::Precharging);
+        transition_to(DataPackets::state::Precharging);
         return;
     }
 }
 
 inline void handle_precharging() {
-    if (!is_state(VCU::OperationalState::Precharging)) return;
+    if (!is_state(DataPackets::state::Precharging)) return;
     if (transition_pending) return;
 
 #ifdef SINGLE
     if (VCU::contactors_closed) {
-        transition_to(VCU::OperationalState::HVActive);
+        transition_to(DataPackets::state::HVActive);
     }
 #else
-    start_confirmed_transition(VCU::OperationalState::HVActive);
+    start_confirmed_transition(DataPackets::state::HVActive);
 #endif
 }
 
 inline void handle_hv_active_orders() {
-    if (!is_state(VCU::OperationalState::HVActive)) {
+    if (!is_state(DataPackets::state::HVActive)) {
         return;
     }
 
     if (OrderPackets::Unbrake_flag) {
         OrderPackets::Unbrake_flag = false;
         if (transition_pending) return;
-        transition_to(VCU::OperationalState::Ready);
+        transition_to(DataPackets::state::Ready);
         return;
     }
 }
 
 inline void handle_ready_orders() {
-    if (!is_state(VCU::OperationalState::Ready)) {
+    if (!is_state(DataPackets::state::Ready)) {
         return;
     }
 
@@ -539,7 +532,7 @@ inline void handle_ready_orders() {
         OrderPackets::Brake_flag = false;
         if (transition_pending) return;
         VCU::engage_brake();
-        transition_to(VCU::OperationalState::HVActive);
+        transition_to(DataPackets::state::HVActive);
         return;
     }
 
@@ -547,34 +540,34 @@ inline void handle_ready_orders() {
         OrderPackets::Propulsion_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
-        transition_to(VCU::OperationalState::Propulsion);
+        transition_to(DataPackets::state::Propulsion);
 #else
         start_propulsion();
-        start_confirmed_transition(VCU::OperationalState::Propulsion);
+        start_confirmed_transition(DataPackets::state::Propulsion);
 #endif
         return;
     }
 
-    if (OrderPackets::Static_levitation_flag) {
-        OrderPackets::Static_levitation_flag = false;
+    if (OrderPackets::Static_Levitation_flag) {
+        OrderPackets::Static_Levitation_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
-        transition_to(VCU::OperationalState::StaticLevitation);
+        transition_to(DataPackets::state::Static_Levitation);
 #else
         start_static_levitation();
-        start_confirmed_transition(VCU::OperationalState::StaticLevitation);
+        start_confirmed_transition(DataPackets::state::Static_Levitation);
 #endif
         return;
     }
 
-    if (OrderPackets::Dynamic_levitation_flag) {
-        OrderPackets::Dynamic_levitation_flag = false;
+    if (OrderPackets::Dynamic_Levitation_flag) {
+        OrderPackets::Dynamic_Levitation_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
-        transition_to(VCU::OperationalState::DynamicLevitation);
+        transition_to(DataPackets::state::Dynamic_Levitation);
 #else
         start_dynamic_levitation();
-        start_confirmed_transition(VCU::OperationalState::DynamicLevitation);
+        start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
 #endif
         return;
     }
@@ -582,9 +575,9 @@ inline void handle_ready_orders() {
 
 inline void handle_active_mode_brake_order() {
     switch (VCU::operational_state) {
-    case VCU::OperationalState::Propulsion:
-    case VCU::OperationalState::StaticLevitation:
-    case VCU::OperationalState::DynamicLevitation:
+    case DataPackets::state::Propulsion:
+    case DataPackets::state::Static_Levitation:
+    case DataPackets::state::Dynamic_Levitation:
         break;
     default:
         return;
@@ -594,102 +587,31 @@ inline void handle_active_mode_brake_order() {
         OrderPackets::Brake_flag = false;
         if (transition_pending) return;
         VCU::engage_brake();
-        transition_to(VCU::OperationalState::HVActive);
+        transition_to(DataPackets::state::HVActive);
     }
 }
 
 inline void handle_static_levitation_orders() {
-    if (!is_state(VCU::OperationalState::StaticLevitation)) {
+    if (!is_state(DataPackets::state::Static_Levitation)) {
         return;
     }
 
-    if (OrderPackets::Dynamic_levitation_flag) {
-        OrderPackets::Dynamic_levitation_flag = false;
+    if (OrderPackets::Dynamic_Levitation_flag) {
+        OrderPackets::Dynamic_Levitation_flag = false;
         if (transition_pending) return;
 #ifdef SINGLE
-        transition_to(VCU::OperationalState::DynamicLevitation);
+        transition_to(DataPackets::state::Dynamic_Levitation);
 #else
         start_propulsion();
-        start_confirmed_transition(VCU::OperationalState::DynamicLevitation);
+        start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
 #endif
         return;
     }
-}
-
-inline void handle_propulsion_orders() {
-#ifdef SINGLE
-    return;
-#else
-    if (!is_state(VCU::OperationalState::Propulsion) &&
-        !is_state(VCU::OperationalState::DynamicLevitation)) {
-        return;
-    }
-
-    if (OrderPackets::Runs_flag) {
-        OrderPackets::Runs_flag = false;
-        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::Runs_order, "runs");
-    }
-    // (TODO) This should not be here
-    if (OrderPackets::SVPWM_flag) {
-        OrderPackets::SVPWM_flag = false;
-        send_remote_order(OrderPackets::pcu_tcp, OrderPackets::SVPWM_order, "SVPWM");
-    }
-    if (OrderPackets::Current_control_flag) {
-        OrderPackets::Current_control_flag = false;
-        send_remote_order(
-            OrderPackets::pcu_tcp,
-            OrderPackets::Current_control_order,
-            "current control"
-        );
-    }
-    if (OrderPackets::Speed_control_flag) {
-        OrderPackets::Speed_control_flag = false;
-        send_remote_order(
-            OrderPackets::pcu_tcp,
-            OrderPackets::Speed_control_order,
-            "speed control"
-        );
-    }
-    if (OrderPackets::Motor_brake_flag) {
-        OrderPackets::Motor_brake_flag = false;
-        send_remote_order(
-            OrderPackets::pcu_tcp,
-            OrderPackets::Motor_brake_order,
-            "motor brake"
-        );
-    }
-#endif
-}
-
-inline void handle_levitation_orders() {
-#ifdef SINGLE
-    return;
-#else
-    if (!is_state(VCU::OperationalState::StaticLevitation) &&
-        !is_state(VCU::OperationalState::DynamicLevitation)) {
-        return;
-    }
-
-    if (OrderPackets::Levitation_flag) {
-        OrderPackets::Levitation_flag = false;
-        send_remote_order(
-            OrderPackets::lcu_tcp,
-            OrderPackets::Levitation_order,
-            "levitation"
-        );
-    }
-#endif
-}
-
-inline void clear_remote_callback_flags() {
-#ifndef SINGLE
-    OrderPackets::Forward_booster_flag = false;
-#endif
 }
 
 inline void clear_stale_order_flags() {
-    if (OrderPackets::MANTEINANCE_flag) {
-        reject_order(OrderPackets::MANTEINANCE_flag, "MANTEINANCE order rejected: not in Connected state");
+    if (OrderPackets::Maintenance_flag) {
+        reject_order(OrderPackets::Maintenance_flag, "Maintenance order rejected: not in Connected state");
     }
     if (OrderPackets::Precharge_flag) {
         reject_order(OrderPackets::Precharge_flag, "Precharge order rejected: not in Connected state");
@@ -703,32 +625,15 @@ inline void clear_stale_order_flags() {
     if (OrderPackets::Propulsion_flag) {
         reject_order(OrderPackets::Propulsion_flag, "Propulsion order rejected: not in Ready state");
     }
-    if (OrderPackets::Static_levitation_flag) {
-        reject_order(OrderPackets::Static_levitation_flag, "Static levitation order rejected: not in Ready state");
+    if (OrderPackets::Static_Levitation_flag) {
+        reject_order(OrderPackets::Static_Levitation_flag, "Static levitation order rejected: not in Ready state");
     }
-    if (OrderPackets::Dynamic_levitation_flag) {
-        reject_order(OrderPackets::Dynamic_levitation_flag, "Dynamic levitation order rejected: not in Ready or StaticLevitation state");
+    if (OrderPackets::Dynamic_Levitation_flag) {
+        reject_order(OrderPackets::Dynamic_Levitation_flag, "Dynamic levitation order rejected: not in Ready or Static_Levitation state");
     }
-#ifndef SINGLE
-    if (OrderPackets::Runs_flag) {
-        reject_order(OrderPackets::Runs_flag, "Runs order rejected: not in Propulsion or DynamicLevitation state");
+    if (OrderPackets::Open_Contactors_flag) {
+        reject_order(OrderPackets::Open_Contactors_flag, "Open contactors order rejected: not in commandable state");
     }
-    if (OrderPackets::SVPWM_flag) {
-        reject_order(OrderPackets::SVPWM_flag, "SVPWM order rejected: not in Propulsion or DynamicLevitation state");
-    }
-    if (OrderPackets::Current_control_flag) {
-        reject_order(OrderPackets::Current_control_flag, "Current control order rejected: not in Propulsion or DynamicLevitation state");
-    }
-    if (OrderPackets::Speed_control_flag) {
-        reject_order(OrderPackets::Speed_control_flag, "Speed control order rejected: not in Propulsion or DynamicLevitation state");
-    }
-    if (OrderPackets::Motor_brake_flag) {
-        reject_order(OrderPackets::Motor_brake_flag, "Motor brake order rejected: not in Propulsion or DynamicLevitation state");
-    }
-    if (OrderPackets::Levitation_flag) {
-        reject_order(OrderPackets::Levitation_flag, "Levitation order rejected: not in StaticLevitation or DynamicLevitation state");
-    }
-#endif
 }
 
 inline void handle_orders() {
@@ -740,9 +645,6 @@ inline void handle_orders() {
     handle_ready_orders();
     handle_active_mode_brake_order();
     handle_static_levitation_orders();
-    handle_propulsion_orders();
-    handle_levitation_orders();
-    clear_remote_callback_flags();
     clear_stale_order_flags();
 }
 
@@ -767,7 +669,7 @@ inline void update_status_leds() {
         return;
     }
 
-    if (is_state(VCU::OperationalState::Idle)) {
+    if (is_state(DataPackets::state::Idle)) {
         VCU::led_connecting->turn_off();
         VCU::led_fault->turn_off();
         VCU::led_operational->toggle();
@@ -782,8 +684,8 @@ inline void update_status_leds() {
 } // namespace Detail
 
 inline void start() {
-    VCU::operational_state = VCU::OperationalState::Idle;
-    Detail::enter_state(VCU::OperationalState::Idle);
+    VCU::operational_state = DataPackets::state::Idle;
+    Detail::enter_state(DataPackets::state::Idle);
     Detail::sample_inputs();
     Detail::refresh_connections();
     Scheduler::register_task(100'000, +[]() { Detail::sample_inputs(); });
