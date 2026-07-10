@@ -10,17 +10,18 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     MockPeer::ethernet_pinset,
     "00:80:e1:00:01:07",
     local_ip,
-    "255.255.0.0"
+    "255.255.255.0"
 );
 
 using Board = MockPeer::Board<eth>;
 
 enum class HVBMS_State : uint8_t {
-    IDLE = 0,
-    READY_TO_PRECHARGE = 1,
-    PRECHARGING = 2,
-    ENERGIZED = 3,
-    FAULT = 4,
+    Connecting = 0,
+    Idle = 1,
+    Ready_To_Precharge = 2,
+    Precharging = 3,
+    Energized = 4,
+    Fault = 5,
 };
 
 inline ST_LIB::EthernetDomain::Instance* ethernet = nullptr;
@@ -32,7 +33,14 @@ inline ServerSocket* vcu_socket = nullptr;
 inline bool connected_to_master = false;
 inline bool was_connected_to_master = false;
 
-inline HVBMS_State nested_sm_state = HVBMS_State::IDLE;
+inline HVBMS_State nested_sm_state = HVBMS_State::Idle;
+inline float dummy_hvbms_voltage_min = 0.0f;
+inline float dummy_hvbms_voltage_max = 0.0f;
+inline float dummy_hvbms_temp_min = 0.0f;
+inline float dummy_hvbms_temp_max = 0.0f;
+inline float dummy_hvbms_current = 0.0f;
+inline float dummy_hvbms_voltage_reading = 0.0f;
+inline float dummy_hvbms_batteries_voltage = 0.0f;
 
 inline HeapPacket* state_packet = nullptr;
 inline DatagramSocket* state_udp = nullptr;
@@ -61,18 +69,26 @@ inline void init() {
     Diagnostics::install_ethernet_sink(vcu_socket);
 
     new HeapOrder(903, +[]() {
-        nested_sm_state = HVBMS_State::PRECHARGING;
-        nested_sm_state = HVBMS_State::ENERGIZED;
+        nested_sm_state = HVBMS_State::Precharging;
+        nested_sm_state = HVBMS_State::Energized;
     });
     new HeapOrder(901, +[]() {
-        nested_sm_state = HVBMS_State::IDLE;
+        nested_sm_state = HVBMS_State::Idle;
     });
     new HeapOrder(0, +[]() {
-        nested_sm_state = HVBMS_State::IDLE;
+        nested_sm_state = HVBMS_State::Idle;
     });
 
     state_packet = new HeapPacket(
-        static_cast<uint16_t>(960), &nested_sm_state
+        static_cast<uint16_t>(950),
+        &dummy_hvbms_voltage_min,
+        &dummy_hvbms_voltage_max,
+        &dummy_hvbms_temp_min,
+        &dummy_hvbms_temp_max,
+        &dummy_hvbms_current,
+        &dummy_hvbms_voltage_reading,
+        &dummy_hvbms_batteries_voltage,
+        &nested_sm_state
     );
 
     state_udp = new DatagramSocket(

@@ -10,14 +10,14 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     MockPeer::ethernet_pinset,
     "00:80:e1:00:01:05",
     local_ip,
-    "255.255.0.0"
+    "255.255.255.0"
 );
 
 using Board = MockPeer::Board<eth>;
 
 enum class PCU_State : uint8_t {
     Connecting = 0,
-    IDLE = 1,
+    Idle = 1,
     Accelerating = 2,
     Fault = 3,
 };
@@ -31,7 +31,7 @@ inline ServerSocket* vcu_socket = nullptr;
 inline bool connected_to_master = false;
 inline bool was_connected_to_master = false;
 
-inline PCU_State pcu_state = PCU_State::IDLE;
+inline PCU_State pcu_state = PCU_State::Idle;
 inline float dummy_svpwm_params[4] = {};
 
 inline HeapPacket* state_packet = nullptr;
@@ -70,7 +70,7 @@ inline void init() {
         &dummy_svpwm_params[3]
     );
     new HeapOrder(508, +[]() {
-        pcu_state = PCU_State::IDLE;
+        pcu_state = PCU_State::Idle;
     });
 
     state_packet = new HeapPacket(

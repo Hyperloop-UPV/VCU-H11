@@ -5,8 +5,8 @@
 using namespace ST_LIB;
 
 int main(void) {
-    Hard_fault_check();
     VCU::init();
+    // HAL_Delay(15 * 1000);
 
     while (1) {
         VCU::update();

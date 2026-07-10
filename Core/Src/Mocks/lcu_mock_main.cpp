@@ -10,7 +10,7 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     MockPeer::ethernet_pinset,
     "00:80:e1:00:01:04",
     local_ip,
-    "255.255.0.0"
+    "255.255.255.0"
 );
 
 using Board = MockPeer::Board<eth>;
@@ -34,6 +34,7 @@ inline bool connected_to_master = false;
 inline bool was_connected_to_master = false;
 
 inline LCU_State lcu_state = LCU_State::Idle;
+inline LCU_State lcu_slave_state = LCU_State::Idle;
 inline float dummy_levitation_distance = 0.0f;
 
 inline HeapPacket* state_packet = nullptr;
@@ -73,7 +74,7 @@ inline void init() {
     });
 
     state_packet = new HeapPacket(
-        static_cast<uint16_t>(9520), &lcu_state
+        static_cast<uint16_t>(9520), &lcu_state, &lcu_slave_state
     );
 
     state_udp = new DatagramSocket(

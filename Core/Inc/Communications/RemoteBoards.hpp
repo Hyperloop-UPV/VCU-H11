@@ -7,12 +7,12 @@
 namespace RemoteBoards {
 
 enum class HVBMS_State : uint8_t {
-    // Connecting???
-    Idle = 0,
-    ReadyToPrecharge = 1,
-    Precharging = 2,
-    Energized = 3,
-    Fault = 4,
+    Connecting = 0,
+    Idle = 1,
+    Ready_To_Precharge = 2,
+    Precharging = 3,
+    Energized = 4,
+    Fault = 5,
 };
 
 enum class PCU_State : uint8_t {
@@ -31,9 +31,18 @@ enum class LCU_State : uint8_t {
     Fault = 5,
 };
 
-inline HVBMS_State hvbms_sm_state = HVBMS_State::Idle;
+inline HVBMS_State hvbms_sm_state = HVBMS_State::Connecting;
 inline PCU_State pcu_state = PCU_State::Connecting;
 inline LCU_State lcu_state = LCU_State::Connecting;
+inline LCU_State lcu_slave_state = LCU_State::Connecting;
+
+inline float hvbms_voltage_min = 0.0f;
+inline float hvbms_voltage_max = 0.0f;
+inline float hvbms_temp_min = 0.0f;
+inline float hvbms_temp_max = 0.0f;
+inline float hvbms_current_reading = 0.0f;
+inline float hvbms_voltage_reading = 0.0f;
+inline float hvbms_batteries_voltage = 0.0f;
 
 inline float propulsion_target_speed = 0.0f;
 inline float propulsion_max_current = 0.0f;
@@ -59,9 +68,18 @@ inline HeapOrder* Stop_to_lcu_order = nullptr;
 inline HeapOrder* Levitate_to_lcu_order = nullptr;
 
 inline void init_remote_state_receivers() {
-    new HeapPacket(static_cast<uint16_t>(960), &hvbms_sm_state);
+    new HeapPacket(static_cast<uint16_t>(950),
+        &hvbms_voltage_min,
+        &hvbms_voltage_max,
+        &hvbms_temp_min,
+        &hvbms_temp_max,
+        &hvbms_current_reading,
+        &hvbms_voltage_reading,
+        &hvbms_batteries_voltage,
+        &hvbms_sm_state
+    );
     new HeapPacket(static_cast<uint16_t>(553), &pcu_state);
-    new HeapPacket(static_cast<uint16_t>(9520), &lcu_state);
+    new HeapPacket(static_cast<uint16_t>(9520), &lcu_state, &lcu_slave_state);
 }
 
 inline void init_remote_orders() {
