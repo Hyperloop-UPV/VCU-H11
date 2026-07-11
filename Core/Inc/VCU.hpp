@@ -38,6 +38,7 @@ using Board = ST_LIB::Board<
 
 inline void init() {
     Board::init();
+    HAL_Delay(10000);
 
     ethernet = &Board::instance_of<eth>();
 
