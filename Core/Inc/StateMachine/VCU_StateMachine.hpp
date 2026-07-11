@@ -11,9 +11,9 @@ namespace Detail {
 
 inline void transition_to_fault(const char* reason);
 
-inline bool transition_pending = false;
-inline uint16_t pending_timeout_task_id = 0;
-inline DataPackets::state pending_transition_target = DataPackets::state::Idle;
+inline bool verification_pending = false;
+inline uint16_t verification_timeout_task_id = 0;
+inline DataPackets::state verification_target = DataPackets::state::Idle;
 
 inline bool is_state(DataPackets::state state) {
     return VCU::operational_state == state;
@@ -299,21 +299,17 @@ inline void do_transition(DataPackets::state next_state) {
     enter_state(next_state);
 }
 
-inline void cancel_pending_transition() {
-    if (!transition_pending) return;
-    transition_pending = false;
-    Scheduler::cancel_timeout(pending_timeout_task_id);
-    pending_timeout_task_id = Scheduler::INVALID_ID;
-}
-
-inline void complete_pending_transition() {
-    transition_pending = false;
-    pending_timeout_task_id = Scheduler::INVALID_ID;
-    VCU::operational_state = pending_transition_target;
+inline void cancel_verification() {
+    if (!verification_pending) return;
+    verification_pending = false;
+    Scheduler::cancel_timeout(verification_timeout_task_id);
+    verification_timeout_task_id = Scheduler::INVALID_ID;
 }
 
 inline bool verify_remote_states(DataPackets::state target) {
     switch (target) {
+        case DataPackets::state::Precharging:
+            return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Precharging;
         case DataPackets::state::HVActive:
             return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Energized;
         case DataPackets::state::Propulsion:
@@ -332,30 +328,43 @@ inline bool verify_remote_states(DataPackets::state target) {
     }
 }
 
-inline void on_transition_timeout() {
-    if (!transition_pending) return;
+inline bool needs_remote_verification(DataPackets::state target) {
+    switch (target) {
+        case DataPackets::state::Precharging:
+        case DataPackets::state::HVActive:
+        case DataPackets::state::Propulsion:
+        case DataPackets::state::Static_Levitation:
+        case DataPackets::state::Dynamic_Levitation:
+        case DataPackets::state::Connected:
+            return true;
+        default:
+            return false;
+    }
+}
 
-    if (verify_remote_states(pending_transition_target)) {
-        complete_pending_transition();
+inline void on_verification_timeout() {
+    if (!verification_pending) return;
+
+    if (verify_remote_states(verification_target)) {
+        verification_pending = false;
+        verification_timeout_task_id = Scheduler::INVALID_ID;
     } else {
-        cancel_pending_transition();
+        cancel_verification();
         transition_to_fault("Remote board did not reach expected state");
     }
 }
 
-inline void start_confirmed_transition(DataPackets::state target) {
-    if (transition_pending) {
-        cancel_pending_transition();
+inline void start_remote_verification(DataPackets::state target) {
+    if (!needs_remote_verification(target)) return;
+
+    if (verification_pending) {
+        cancel_verification();
     }
 
-    transition_pending = true;
-    pending_transition_target = target;
-
-    uint32_t timeout_us = (target == DataPackets::state::HVActive)
-        ? 6'000'000 : 200'000;
-
-    pending_timeout_task_id = Scheduler::set_timeout(timeout_us, +[]() {
-        on_transition_timeout();
+    verification_pending = true;
+    verification_target = target;
+    verification_timeout_task_id = Scheduler::set_timeout(VCU::remote_ack_timeout_us, +[]() {
+        on_verification_timeout();
     });
 }
 
@@ -364,14 +373,7 @@ inline void transition_to(DataPackets::state next_state) {
         return;
     }
 
-    if (transition_pending) {
-        if (next_state == DataPackets::state::Connected ||
-            next_state == DataPackets::state::Fault) {
-            cancel_pending_transition();
-        } else {
-            return;
-        }
-    }
+    cancel_verification();
 
     if (next_state == DataPackets::state::Fault) {
         do_transition(DataPackets::state::Fault);
@@ -379,10 +381,11 @@ inline void transition_to(DataPackets::state next_state) {
     }
 
     do_transition(next_state);
+    start_remote_verification(next_state);
 }
 
 inline void transition_to_fault(const char* reason) {
-    cancel_pending_transition();
+    cancel_verification();
     if (!is_state(DataPackets::state::Fault)) {
         exit_state(VCU::operational_state);
         VCU::operational_state = DataPackets::state::Fault;
@@ -440,15 +443,7 @@ inline void handle_common_orders() {
         case DataPackets::state::Propulsion:
         case DataPackets::state::Static_Levitation:
         case DataPackets::state::Dynamic_Levitation:
-            cancel_pending_transition();
-            exit_state(VCU::operational_state);
-            VCU::engage_brake();
-            request_open_contactors();
-#ifdef SINGLE
-            VCU::operational_state = DataPackets::state::Connected;
-        #else
-            start_confirmed_transition(DataPackets::state::Connected);
-#endif
+            transition_to(DataPackets::state::Connected);
             break;
         default:
             break;
@@ -463,12 +458,8 @@ inline void handle_common_orders() {
         case DataPackets::state::Precharging:
         case DataPackets::state::HVActive:
         case DataPackets::state::Ready:
-            cancel_pending_transition();
-            exit_state(VCU::operational_state);
-            VCU::engage_brake();
-            request_open_contactors();
-            VCU::operational_state = DataPackets::state::Connected;
-                    break;
+            transition_to(DataPackets::state::Connected);
+            break;
         default:
             WARNING("Open contactors order ignored: not in commandable state");
             break;
@@ -484,14 +475,12 @@ inline void handle_connected_orders() {
 
     if (OrderPackets::Maintenance_flag) {
         OrderPackets::Maintenance_flag = false;
-        if (transition_pending) return;
         transition_to(DataPackets::state::Maintenance);
         return;
     }
 
     if (OrderPackets::Precharge_flag) {
         OrderPackets::Precharge_flag = false;
-        if (transition_pending) return;
         transition_to(DataPackets::state::Precharging);
         return;
     }
@@ -499,14 +488,15 @@ inline void handle_connected_orders() {
 
 inline void handle_precharging() {
     if (!is_state(DataPackets::state::Precharging)) return;
-    if (transition_pending) return;
 
 #ifdef SINGLE
     if (VCU::contactors_closed) {
         transition_to(DataPackets::state::HVActive);
     }
 #else
-    start_confirmed_transition(DataPackets::state::HVActive);
+    if (RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Energized) {
+        transition_to(DataPackets::state::HVActive);
+    }
 #endif
 }
 
@@ -517,7 +507,6 @@ inline void handle_hv_active_orders() {
 
     if (OrderPackets::Unbrake_flag) {
         OrderPackets::Unbrake_flag = false;
-        if (transition_pending) return;
         transition_to(DataPackets::state::Ready);
         return;
     }
@@ -530,7 +519,6 @@ inline void handle_ready_orders() {
 
     if (OrderPackets::Brake_flag) {
         OrderPackets::Brake_flag = false;
-        if (transition_pending) return;
         VCU::engage_brake();
         transition_to(DataPackets::state::HVActive);
         return;
@@ -539,75 +527,24 @@ inline void handle_ready_orders() {
     if (OrderPackets::Propulsion_flag || OrderPackets::Propulsion_Parameterized_flag) {
         OrderPackets::Propulsion_flag = false;
         OrderPackets::Propulsion_Parameterized_flag = false;
-        if (transition_pending) return;
-#ifdef SINGLE
         RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Propulsion);
-#else
-        start_propulsion();
-        RemoteBoards::reset_control_params();
-        start_confirmed_transition(DataPackets::state::Propulsion);
-#endif
         return;
     }
 
     if (OrderPackets::Static_Levitation_flag || OrderPackets::Static_Levitation_Parameterized_flag) {
         OrderPackets::Static_Levitation_flag = false;
         OrderPackets::Static_Levitation_Parameterized_flag = false;
-        if (transition_pending) return;
-#ifdef SINGLE
         RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Static_Levitation);
-#else
-        start_static_levitation();
-        RemoteBoards::reset_control_params();
-        start_confirmed_transition(DataPackets::state::Static_Levitation);
-#endif
         return;
     }
 
     if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
-        if (transition_pending) return;
-#ifdef SINGLE
         RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Dynamic_Levitation);
-#else
-        start_dynamic_levitation();
-        RemoteBoards::reset_control_params();
-        start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
-#endif
-        return;
-    }
-
-    if (OrderPackets::Static_Levitation_flag || OrderPackets::Static_Levitation_Parameterized_flag) {
-        OrderPackets::Static_Levitation_flag = false;
-        OrderPackets::Static_Levitation_Parameterized_flag = false;
-        if (transition_pending) return;
-#ifdef SINGLE
-        RemoteBoards::levitation_target_height = 0.0f;
-        transition_to(DataPackets::state::Static_Levitation);
-#else
-        start_static_levitation();
-        RemoteBoards::levitation_target_height = 0.0f;
-        start_confirmed_transition(DataPackets::state::Static_Levitation);
-#endif
-        return;
-    }
-
-    if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
-        OrderPackets::Dynamic_Levitation_flag = false;
-        OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
-        if (transition_pending) return;
-#ifdef SINGLE
-        RemoteBoards::reset_control_params();
-        transition_to(DataPackets::state::Dynamic_Levitation);
-#else
-        start_propulsion();
-        RemoteBoards::reset_control_params();
-        start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
-#endif
         return;
     }
 }
@@ -624,7 +561,6 @@ inline void handle_active_mode_brake_order() {
 
     if (OrderPackets::Brake_flag) {
         OrderPackets::Brake_flag = false;
-        if (transition_pending) return;
         VCU::engage_brake();
         transition_to(DataPackets::state::HVActive);
     }
@@ -638,19 +574,8 @@ inline void handle_static_levitation_orders() {
     if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
-        if (transition_pending) return;
-#ifdef SINGLE
-        RemoteBoards::propulsion_target_speed = 0.0f;
-        RemoteBoards::propulsion_max_current = 0.0f;
-        RemoteBoards::levitation_target_height = 0.0f;
+        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Dynamic_Levitation);
-#else
-        start_propulsion();
-        RemoteBoards::propulsion_target_speed = 0.0f;
-        RemoteBoards::propulsion_max_current = 0.0f;
-        RemoteBoards::levitation_target_height = 0.0f;
-        start_confirmed_transition(DataPackets::state::Dynamic_Levitation);
-#endif
         return;
     }
 }
