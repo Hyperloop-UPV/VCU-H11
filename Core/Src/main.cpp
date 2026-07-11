@@ -6,7 +6,6 @@ using namespace ST_LIB;
 
 int main(void) {
     VCU::init();
-    // HAL_Delay(15 * 1000);
 
     while (1) {
         VCU::update();
