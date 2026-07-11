@@ -116,6 +116,9 @@ inline void init() {
     Diagnostics::install_ethernet_sink(OrderPackets::control_station_tcp);
 
     VCU_StateMachine::start();
+    using namespace std::chrono_literals;
+    Watchdog::watchdog_time = 100ms;
+    Watchdog::start();
 }
 
 inline void update() {
@@ -125,6 +128,7 @@ inline void update() {
     Board::evaluate_protections();
     Diagnostics::Hub::flush();
     Scheduler::update();
+    Watchdog::refresh();
 }
 
 } // namespace VCU
