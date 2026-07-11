@@ -527,24 +527,24 @@ inline void handle_ready_orders() {
     if (OrderPackets::Propulsion_flag || OrderPackets::Propulsion_Parameterized_flag) {
         OrderPackets::Propulsion_flag = false;
         OrderPackets::Propulsion_Parameterized_flag = false;
-        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Propulsion);
+        RemoteBoards::reset_control_params();
         return;
     }
 
     if (OrderPackets::Static_Levitation_flag || OrderPackets::Static_Levitation_Parameterized_flag) {
         OrderPackets::Static_Levitation_flag = false;
         OrderPackets::Static_Levitation_Parameterized_flag = false;
-        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Static_Levitation);
+        RemoteBoards::reset_control_params();
         return;
     }
 
     if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
-        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Dynamic_Levitation);
+        RemoteBoards::reset_control_params();
         return;
     }
 }
@@ -574,8 +574,8 @@ inline void handle_static_levitation_orders() {
     if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
-        RemoteBoards::reset_control_params();
         transition_to(DataPackets::state::Dynamic_Levitation);
+        RemoteBoards::reset_control_params();
         return;
     }
 }
