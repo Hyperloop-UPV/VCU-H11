@@ -742,6 +742,9 @@ inline void start() {
     VCU::operational_state = DataPackets::state::Idle;
     Detail::enter_state(DataPackets::state::Idle);
     Detail::sample_inputs();
+    if (VCU::brake_fault != nullptr && VCU::brake_fault->read() != GPIO_PIN_SET) {
+        Detail::transition_to_fault("brakes are not deployed when the POD turns on");
+    }
     Detail::refresh_connections();
     Scheduler::register_task(100'000, +[]() { Detail::sample_inputs(); });
     Scheduler::register_task(200'000, +[]() { Detail::update_status_leds(); });
