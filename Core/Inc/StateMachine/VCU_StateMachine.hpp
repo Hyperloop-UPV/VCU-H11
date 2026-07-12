@@ -401,24 +401,6 @@ inline void reject_order(bool& flag, const char* message) {
     flag = false;
 }
 
-inline void check_fault_inputs() {
-    if (is_fault_state()) {
-        return;
-    }
-
-#ifndef DISABLE_BRAKE_FAULT_PROTECTION
-    if (VCU::brake_fault_detected) {
-        transition_to_fault("Brake fault detected");
-        return;
-    }
-#endif
-
-    if (!VCU::sdc_closed) {
-        transition_to_fault("SDC is open");
-        return;
-    }
-}
-
 inline void handle_connection_transition() {
     if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected) {
         transition_to(DataPackets::state::Connected);
@@ -679,7 +661,6 @@ inline void update() {
     Detail::sample_inputs();
     Detail::check_pressure_warning();
     Detail::refresh_connections();
-    Detail::check_fault_inputs();
     if (Detail::is_fault_state()) {
         return;
     }
