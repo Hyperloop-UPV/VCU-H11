@@ -181,7 +181,7 @@ inline SensorInterrupt sdc_closed_sensor;
 inline NTC ntc_temperature_1_sensor;
 inline NTC ntc_temperature_2_sensor;
 
-inline constexpr auto sdc_closed_protection = Protections::protection<"sdc_closed", sdc_closed>(
+inline constexpr auto sdc_closed_protection = Protections::protection<"SDC", sdc_closed>(
     Protections::Rules::equals(false)
 );
 
