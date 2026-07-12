@@ -342,6 +342,83 @@ inline bool needs_remote_verification(DataPackets::state target) {
     }
 }
 
+inline const char* hvbms_state_name(RemoteBoards::HVBMS_State s) {
+    switch (s) {
+    case RemoteBoards::HVBMS_State::Connecting: return "Connecting";
+    case RemoteBoards::HVBMS_State::Idle: return "Idle";
+    case RemoteBoards::HVBMS_State::Ready_To_Precharge: return "Ready_To_Precharge";
+    case RemoteBoards::HVBMS_State::Precharging: return "Precharging";
+    case RemoteBoards::HVBMS_State::Energized: return "Energized";
+    case RemoteBoards::HVBMS_State::Fault: return "Fault";
+    default: return "Unknown";
+    }
+}
+
+inline const char* pcu_state_name(RemoteBoards::PCU_State s) {
+    switch (s) {
+    case RemoteBoards::PCU_State::Connecting: return "Connecting";
+    case RemoteBoards::PCU_State::Idle: return "Idle";
+    case RemoteBoards::PCU_State::Accelerating: return "Accelerating";
+    case RemoteBoards::PCU_State::Fault: return "Fault";
+    default: return "Unknown";
+    }
+}
+
+inline const char* lcu_state_name(RemoteBoards::LCU_State s) {
+    switch (s) {
+    case RemoteBoards::LCU_State::Connecting: return "Connecting";
+    case RemoteBoards::LCU_State::Idle: return "Idle";
+    case RemoteBoards::LCU_State::Levitating: return "Levitating";
+    case RemoteBoards::LCU_State::Current_Control: return "Current_Control";
+    case RemoteBoards::LCU_State::Debug: return "Debug";
+    case RemoteBoards::LCU_State::Fault: return "Fault";
+    default: return "Unknown";
+    }
+}
+
+inline const char* verification_fault_reason(DataPackets::state target) {
+    static char buffer[128];
+    switch (target) {
+    case DataPackets::state::Precharging:
+        snprintf(buffer, sizeof(buffer),
+            "HVBMS expected Precharging, got %s",
+            hvbms_state_name(RemoteBoards::hvbms_sm_state));
+        break;
+    case DataPackets::state::HVActive:
+        snprintf(buffer, sizeof(buffer),
+            "HVBMS expected Energized, got %s",
+            hvbms_state_name(RemoteBoards::hvbms_sm_state));
+        break;
+    case DataPackets::state::Propulsion:
+        snprintf(buffer, sizeof(buffer),
+            "PCU expected Accelerating, got %s",
+            pcu_state_name(RemoteBoards::pcu_state));
+        break;
+    case DataPackets::state::Static_Levitation:
+        snprintf(buffer, sizeof(buffer),
+            "LCU expected Levitating, got %s",
+            lcu_state_name(RemoteBoards::lcu_state));
+        break;
+    case DataPackets::state::Dynamic_Levitation:
+        snprintf(buffer, sizeof(buffer),
+            "LCU expected Levitating got %s, PCU expected Accelerating got %s",
+            lcu_state_name(RemoteBoards::lcu_state),
+            pcu_state_name(RemoteBoards::pcu_state));
+        break;
+    case DataPackets::state::Connected:
+        snprintf(buffer, sizeof(buffer),
+            "HVBMS expected Idle got %s, PCU expected Idle got %s, LCU expected Idle got %s",
+            hvbms_state_name(RemoteBoards::hvbms_sm_state),
+            pcu_state_name(RemoteBoards::pcu_state),
+            lcu_state_name(RemoteBoards::lcu_state));
+        break;
+    default:
+        snprintf(buffer, sizeof(buffer), "Remote board did not reach expected state");
+        break;
+    }
+    return buffer;
+}
+
 inline void on_verification_timeout() {
     if (!verification_pending) return;
 
@@ -350,7 +427,7 @@ inline void on_verification_timeout() {
         verification_timeout_task_id = Scheduler::INVALID_ID;
     } else {
         cancel_verification();
-        transition_to_fault("Remote board did not reach expected state");
+        transition_to_fault(verification_fault_reason(verification_target));
     }
 }
 
@@ -463,6 +540,10 @@ inline void handle_connected_orders() {
 
     if (OrderPackets::Precharge_flag) {
         OrderPackets::Precharge_flag = false;
+        if (RemoteBoards::hvbms_sm_state != RemoteBoards::HVBMS_State::Ready_To_Precharge) {
+            WARNING("Cannot precharge: HVBMS not ready to precharge");
+            return;
+        }
         transition_to(DataPackets::state::Precharging);
         return;
     }
