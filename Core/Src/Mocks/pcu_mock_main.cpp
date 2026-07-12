@@ -61,32 +61,32 @@ inline void init() {
     Diagnostics::install_ethernet_sink(vcu_socket);
 
     new HeapOrder(
-        507, +[]() {
-            pcu_state = PCU_State::Accelerating;
-        },
+        507,
+        +[]() { pcu_state = PCU_State::Accelerating; },
         &dummy_svpwm_params[0],
         &dummy_svpwm_params[1],
         &dummy_svpwm_params[2],
         &dummy_svpwm_params[3]
     );
-    new HeapOrder(508, +[]() {
-        pcu_state = PCU_State::Idle;
-    });
-
-    state_packet = new HeapPacket(
-        static_cast<uint16_t>(553), &pcu_state
+    new HeapOrder(
+        508,
+        +[]() { pcu_state = PCU_State::Idle; }
     );
 
-    state_udp = new DatagramSocket(
-        "192.168.1.5", 50402, "192.168.1.3", 50402
-    );
+    state_packet = new HeapPacket(static_cast<uint16_t>(553), &pcu_state);
 
-    Scheduler::register_task(16'670, +[]() {
-        state_udp->send_packet(*state_packet);
-    });
+    state_udp = new DatagramSocket("192.168.1.5", 50402, "192.168.1.3", 50402);
+
+    Scheduler::register_task(
+        16'670,
+        +[]() { state_udp->send_packet(*state_packet); }
+    );
 
 #ifndef MOCK_NO_LEDS
-    Scheduler::register_task(200'000, +[]() { update_leds(); });
+    Scheduler::register_task(
+        200'000,
+        +[]() { update_leds(); }
+    );
 #endif
 }
 

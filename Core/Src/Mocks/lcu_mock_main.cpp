@@ -64,29 +64,29 @@ inline void init() {
     Diagnostics::install_ethernet_sink(vcu_socket);
 
     new HeapOrder(
-        9010, +[]() {
-            lcu_state = LCU_State::Levitating;
-        },
+        9010,
+        +[]() { lcu_state = LCU_State::Levitating; },
         &dummy_levitation_distance
     );
-    new HeapOrder(9000, +[]() {
-        lcu_state = LCU_State::Idle;
-    });
-
-    state_packet = new HeapPacket(
-        static_cast<uint16_t>(9520), &lcu_state, &lcu_slave_state
+    new HeapOrder(
+        9000,
+        +[]() { lcu_state = LCU_State::Idle; }
     );
 
-    state_udp = new DatagramSocket(
-        "192.168.1.4", 50405, "192.168.1.3", 50405
-    );
+    state_packet = new HeapPacket(static_cast<uint16_t>(9520), &lcu_state, &lcu_slave_state);
 
-    Scheduler::register_task(500, +[]() {
-        state_udp->send_packet(*state_packet);
-    });
+    state_udp = new DatagramSocket("192.168.1.4", 50405, "192.168.1.3", 50405);
+
+    Scheduler::register_task(
+        500,
+        +[]() { state_udp->send_packet(*state_packet); }
+    );
 
 #ifndef MOCK_NO_LEDS
-    Scheduler::register_task(200'000, +[]() { update_leds(); });
+    Scheduler::register_task(
+        200'000,
+        +[]() { update_leds(); }
+    );
 #endif
 }
 

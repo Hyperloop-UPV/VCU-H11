@@ -204,6 +204,18 @@ inline void release_brake() {
     }
 }
 
+inline void request_open_contactors() {
+#ifdef SINGLE
+    contactors_closed = false;
+#else
+    if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected() &&
+        RemoteBoards::Open_contactors_to_hvbms_order != nullptr) {
+        OrderPackets::hvbms_tcp->send_order(*RemoteBoards::Open_contactors_to_hvbms_order);
+    }
+    contactors_closed = false;
+#endif
+}
+
 inline void on_fault_enter() {
     operational_state = DataPackets::state::Fault;
     if (led_operational != nullptr) {
@@ -227,6 +239,7 @@ inline void on_fault_enter() {
     electrovalve_enabled = false;
     contactors_closed = false;
     engage_brake();
+    request_open_contactors();
 }
 
 } // namespace VCU

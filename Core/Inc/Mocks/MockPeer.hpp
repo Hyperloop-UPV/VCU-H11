@@ -21,7 +21,7 @@ inline constexpr auto disconnected_led_req =
 
 #if defined(USE_PHY_LAN8742) || defined(USE_PHY_LAN8700)
 inline constexpr auto ethernet_pinset = ST_LIB::EthernetDomain::PINSET_H10;
-#elif  defined(USE_PHY_KSZ8041)
+#elif defined(USE_PHY_KSZ8041)
 inline constexpr auto ethernet_pinset = ST_LIB::EthernetDomain::PINSET_H11;
 #else
 #error "No PHY selected for Ethernet pinset selection"
@@ -31,9 +31,7 @@ inline void on_fault_enter() {}
 
 #ifdef MOCK_NO_LEDS
 template <auto& EthernetRequest>
-using Board = ST_LIB::Board<
-    ST_LIB::FaultPolicyNoMachine<on_fault_enter>,
-    EthernetRequest>;
+using Board = ST_LIB::Board<ST_LIB::FaultPolicyNoMachine<on_fault_enter>, EthernetRequest>;
 #else
 template <auto& EthernetRequest>
 using Board = ST_LIB::Board<

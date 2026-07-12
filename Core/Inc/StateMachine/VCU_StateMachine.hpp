@@ -15,9 +15,7 @@ inline bool verification_pending = false;
 inline uint16_t verification_timeout_task_id = 0;
 inline DataPackets::state verification_target = DataPackets::state::Idle;
 
-inline bool is_state(DataPackets::state state) {
-    return VCU::operational_state == state;
-}
+inline bool is_state(DataPackets::state state) { return VCU::operational_state == state; }
 
 inline bool is_fault_state() {
     return is_state(DataPackets::state::Fault) || FaultController::is_faulted();
@@ -51,9 +49,7 @@ inline void check_pressure_warning() {
     VCU::high_pressure_warning_active = false;
 }
 
-inline bool socket_connected(auto* socket) {
-    return socket != nullptr && socket->is_connected();
-}
+inline bool socket_connected(auto* socket) { return socket != nullptr && socket->is_connected(); }
 
 inline void reconnect_if_needed(auto* socket) {
     if (socket != nullptr && !socket->is_connected()) {
@@ -95,27 +91,11 @@ inline bool send_remote_order(auto* socket, HeapOrder* order, const char* descri
     return true;
 }
 
-inline void request_open_contactors() {
-#ifdef SINGLE
-    VCU::contactors_closed = false;
-#else
-    if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected() &&
-        RemoteBoards::Open_contactors_to_hvbms_order != nullptr) {
-        OrderPackets::hvbms_tcp->send_order(*RemoteBoards::Open_contactors_to_hvbms_order);
-    }
-    VCU::contactors_closed = false;
-#endif
-}
-
 inline void request_precharge() {
 #ifdef SINGLE
     VCU::contactors_closed = true;
 #else
-    send_remote_order(
-        OrderPackets::hvbms_tcp,
-        RemoteBoards::Precharge_to_hvbms_order,
-        "precharge"
-    );
+    send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::Precharge_to_hvbms_order, "precharge");
 #endif
 }
 
@@ -131,21 +111,13 @@ inline void stop_propulsion() {
 
 inline void stop_levitation() {
 #ifndef SINGLE
-    send_remote_order(
-        OrderPackets::lcu_tcp,
-        RemoteBoards::Stop_to_lcu_order,
-        "stop levitation"
-    );
+    send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::Stop_to_lcu_order, "stop levitation");
 #endif
 }
 
 inline void start_propulsion() {
 #ifndef SINGLE
-    send_remote_order(
-        OrderPackets::pcu_tcp,
-        RemoteBoards::Start_SVPWM_to_pcu_order,
-        "propulsion"
-    );
+    send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::Start_SVPWM_to_pcu_order, "propulsion");
 #endif
 }
 
@@ -162,20 +134,6 @@ inline void start_static_levitation() {
 inline void start_dynamic_levitation() {
     start_static_levitation();
     start_propulsion();
-}
-
-inline void propagate_fault() {
-#ifndef SINGLE
-    if (OrderPackets::pcu_tcp != nullptr && OrderPackets::pcu_tcp->is_connected()) {
-        OrderPackets::pcu_tcp->send_order(*RemoteBoards::Stop_Motor_to_pcu_order);
-    }
-    if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected()) {
-        OrderPackets::hvbms_tcp->send_order(*RemoteBoards::FAULT_to_hvbms_order);
-    }
-    if (OrderPackets::lcu_tcp != nullptr && OrderPackets::lcu_tcp->is_connected()) {
-        OrderPackets::lcu_tcp->send_order(*RemoteBoards::Stop_to_lcu_order);
-    }
-#endif
 }
 
 inline void refresh_connections() {
@@ -210,18 +168,8 @@ inline void refresh_connections() {
         "HVBMS",
         "HVBMS disconnected"
     );
-    handle_connection_change(
-        VCU::pcu_connected,
-        VCU::pcu_was_connected,
-        "PCU",
-        "PCU disconnected"
-    );
-    handle_connection_change(
-        VCU::lcu_connected,
-        VCU::lcu_was_connected,
-        "LCU",
-        "LCU disconnected"
-    );
+    handle_connection_change(VCU::pcu_connected, VCU::pcu_was_connected, "PCU", "PCU disconnected");
+    handle_connection_change(VCU::lcu_connected, VCU::lcu_was_connected, "LCU", "LCU disconnected");
 #else
     VCU::hvbms_was_connected = false;
     VCU::pcu_was_connected = false;
@@ -254,11 +202,11 @@ inline void enter_state(DataPackets::state state) {
     switch (state) {
     case DataPackets::state::Idle:
         VCU::engage_brake();
-        request_open_contactors();
+        VCU::request_open_contactors();
         break;
     case DataPackets::state::Connected:
         VCU::engage_brake();
-        request_open_contactors();
+        VCU::request_open_contactors();
         break;
     case DataPackets::state::Maintenance:
         VCU::release_brake();
@@ -280,19 +228,12 @@ inline void enter_state(DataPackets::state state) {
     case DataPackets::state::Dynamic_Levitation:
         start_dynamic_levitation();
         break;
-    case DataPackets::state::Fault:
-        if (VCU::led_fault != nullptr) {
-            VCU::led_fault->turn_on();
-        }
-        propagate_fault();
-        request_open_contactors();
-        VCU::engage_brake();
-        break;
     }
 }
 
 inline void do_transition(DataPackets::state next_state) {
-    if (VCU::operational_state == next_state) return;
+    if (VCU::operational_state == next_state)
+        return;
     const auto previous_state = VCU::operational_state;
     exit_state(previous_state);
     VCU::operational_state = next_state;
@@ -300,7 +241,8 @@ inline void do_transition(DataPackets::state next_state) {
 }
 
 inline void cancel_verification() {
-    if (!verification_pending) return;
+    if (!verification_pending)
+        return;
     verification_pending = false;
     Scheduler::cancel_timeout(verification_timeout_task_id);
     verification_timeout_task_id = Scheduler::INVALID_ID;
@@ -308,71 +250,91 @@ inline void cancel_verification() {
 
 inline bool verify_remote_states(DataPackets::state target) {
     switch (target) {
-        case DataPackets::state::Precharging:
-            return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Precharging;
-        case DataPackets::state::HVActive:
-            return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Energized;
-        case DataPackets::state::Propulsion:
-            return RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
-        case DataPackets::state::Static_Levitation:
-            return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating;
-        case DataPackets::state::Dynamic_Levitation:
-            return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating
-                && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
-        case DataPackets::state::Connected:
-            return (RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Idle || RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Ready_To_Precharge)
-                && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Idle
-                && RemoteBoards::lcu_state == RemoteBoards::LCU_State::Idle;
-        default:
-            return true;
+    case DataPackets::state::Precharging:
+        return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Precharging;
+    case DataPackets::state::HVActive:
+        return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Energized;
+    case DataPackets::state::Propulsion:
+        return RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
+    case DataPackets::state::Static_Levitation:
+        return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating;
+    case DataPackets::state::Dynamic_Levitation:
+        return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating &&
+               RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
+    case DataPackets::state::Connected:
+        return (RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Idle ||
+                RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Ready_To_Precharge) &&
+               RemoteBoards::pcu_state == RemoteBoards::PCU_State::Idle &&
+               RemoteBoards::lcu_state == RemoteBoards::LCU_State::Idle;
+    default:
+        return true;
     }
 }
 
 inline bool needs_remote_verification(DataPackets::state target) {
     switch (target) {
-        case DataPackets::state::Precharging:
-        case DataPackets::state::HVActive:
-        case DataPackets::state::Propulsion:
-        case DataPackets::state::Static_Levitation:
-        case DataPackets::state::Dynamic_Levitation:
-        case DataPackets::state::Connected:
-            return true;
-        default:
-            return false;
+    case DataPackets::state::Precharging:
+    case DataPackets::state::HVActive:
+    case DataPackets::state::Propulsion:
+    case DataPackets::state::Static_Levitation:
+    case DataPackets::state::Dynamic_Levitation:
+    case DataPackets::state::Connected:
+        return true;
+    default:
+        return false;
     }
 }
 
 inline const char* hvbms_state_name(RemoteBoards::HVBMS_State s) {
     switch (s) {
-    case RemoteBoards::HVBMS_State::Connecting: return "Connecting";
-    case RemoteBoards::HVBMS_State::Idle: return "Idle";
-    case RemoteBoards::HVBMS_State::Ready_To_Precharge: return "Ready_To_Precharge";
-    case RemoteBoards::HVBMS_State::Precharging: return "Precharging";
-    case RemoteBoards::HVBMS_State::Energized: return "Energized";
-    case RemoteBoards::HVBMS_State::Fault: return "Fault";
-    default: return "Unknown";
+    case RemoteBoards::HVBMS_State::Connecting:
+        return "Connecting";
+    case RemoteBoards::HVBMS_State::Idle:
+        return "Idle";
+    case RemoteBoards::HVBMS_State::Ready_To_Precharge:
+        return "Ready_To_Precharge";
+    case RemoteBoards::HVBMS_State::Precharging:
+        return "Precharging";
+    case RemoteBoards::HVBMS_State::Energized:
+        return "Energized";
+    case RemoteBoards::HVBMS_State::Fault:
+        return "Fault";
+    default:
+        return "Unknown";
     }
 }
 
 inline const char* pcu_state_name(RemoteBoards::PCU_State s) {
     switch (s) {
-    case RemoteBoards::PCU_State::Connecting: return "Connecting";
-    case RemoteBoards::PCU_State::Idle: return "Idle";
-    case RemoteBoards::PCU_State::Accelerating: return "Accelerating";
-    case RemoteBoards::PCU_State::Fault: return "Fault";
-    default: return "Unknown";
+    case RemoteBoards::PCU_State::Connecting:
+        return "Connecting";
+    case RemoteBoards::PCU_State::Idle:
+        return "Idle";
+    case RemoteBoards::PCU_State::Accelerating:
+        return "Accelerating";
+    case RemoteBoards::PCU_State::Fault:
+        return "Fault";
+    default:
+        return "Unknown";
     }
 }
 
 inline const char* lcu_state_name(RemoteBoards::LCU_State s) {
     switch (s) {
-    case RemoteBoards::LCU_State::Connecting: return "Connecting";
-    case RemoteBoards::LCU_State::Idle: return "Idle";
-    case RemoteBoards::LCU_State::Levitating: return "Levitating";
-    case RemoteBoards::LCU_State::Current_Control: return "Current_Control";
-    case RemoteBoards::LCU_State::Debug: return "Debug";
-    case RemoteBoards::LCU_State::Fault: return "Fault";
-    default: return "Unknown";
+    case RemoteBoards::LCU_State::Connecting:
+        return "Connecting";
+    case RemoteBoards::LCU_State::Idle:
+        return "Idle";
+    case RemoteBoards::LCU_State::Levitating:
+        return "Levitating";
+    case RemoteBoards::LCU_State::Current_Control:
+        return "Current_Control";
+    case RemoteBoards::LCU_State::Debug:
+        return "Debug";
+    case RemoteBoards::LCU_State::Fault:
+        return "Fault";
+    default:
+        return "Unknown";
     }
 }
 
@@ -380,37 +342,55 @@ inline const char* verification_fault_reason(DataPackets::state target) {
     static char buffer[128];
     switch (target) {
     case DataPackets::state::Precharging:
-        snprintf(buffer, sizeof(buffer),
+        snprintf(
+            buffer,
+            sizeof(buffer),
             "HVBMS expected Precharging, got %s",
-            hvbms_state_name(RemoteBoards::hvbms_sm_state));
+            hvbms_state_name(RemoteBoards::hvbms_sm_state)
+        );
         break;
     case DataPackets::state::HVActive:
-        snprintf(buffer, sizeof(buffer),
+        snprintf(
+            buffer,
+            sizeof(buffer),
             "HVBMS expected Energized, got %s",
-            hvbms_state_name(RemoteBoards::hvbms_sm_state));
+            hvbms_state_name(RemoteBoards::hvbms_sm_state)
+        );
         break;
     case DataPackets::state::Propulsion:
-        snprintf(buffer, sizeof(buffer),
+        snprintf(
+            buffer,
+            sizeof(buffer),
             "PCU expected Accelerating, got %s",
-            pcu_state_name(RemoteBoards::pcu_state));
+            pcu_state_name(RemoteBoards::pcu_state)
+        );
         break;
     case DataPackets::state::Static_Levitation:
-        snprintf(buffer, sizeof(buffer),
+        snprintf(
+            buffer,
+            sizeof(buffer),
             "LCU expected Levitating, got %s",
-            lcu_state_name(RemoteBoards::lcu_state));
+            lcu_state_name(RemoteBoards::lcu_state)
+        );
         break;
     case DataPackets::state::Dynamic_Levitation:
-        snprintf(buffer, sizeof(buffer),
+        snprintf(
+            buffer,
+            sizeof(buffer),
             "LCU expected Levitating got %s, PCU expected Accelerating got %s",
             lcu_state_name(RemoteBoards::lcu_state),
-            pcu_state_name(RemoteBoards::pcu_state));
+            pcu_state_name(RemoteBoards::pcu_state)
+        );
         break;
     case DataPackets::state::Connected:
-        snprintf(buffer, sizeof(buffer),
+        snprintf(
+            buffer,
+            sizeof(buffer),
             "HVBMS expected Idle got %s, PCU expected Idle got %s, LCU expected Idle got %s",
             hvbms_state_name(RemoteBoards::hvbms_sm_state),
             pcu_state_name(RemoteBoards::pcu_state),
-            lcu_state_name(RemoteBoards::lcu_state));
+            lcu_state_name(RemoteBoards::lcu_state)
+        );
         break;
     default:
         snprintf(buffer, sizeof(buffer), "Remote board did not reach expected state");
@@ -420,7 +400,8 @@ inline const char* verification_fault_reason(DataPackets::state target) {
 }
 
 inline void on_verification_timeout() {
-    if (!verification_pending) return;
+    if (!verification_pending)
+        return;
 
     if (verify_remote_states(verification_target)) {
         verification_pending = false;
@@ -432,7 +413,8 @@ inline void on_verification_timeout() {
 }
 
 inline void start_remote_verification(DataPackets::state target) {
-    if (!needs_remote_verification(target)) return;
+    if (!needs_remote_verification(target))
+        return;
 
     if (verification_pending) {
         cancel_verification();
@@ -440,9 +422,10 @@ inline void start_remote_verification(DataPackets::state target) {
 
     verification_pending = true;
     verification_target = target;
-    verification_timeout_task_id = Scheduler::set_timeout(VCU::remote_ack_timeout_us, +[]() {
-        on_verification_timeout();
-    });
+    verification_timeout_task_id = Scheduler::set_timeout(
+        VCU::remote_ack_timeout_us,
+        +[]() { on_verification_timeout(); }
+    );
 }
 
 inline void transition_to(DataPackets::state next_state) {
@@ -466,7 +449,6 @@ inline void transition_to_fault(const char* reason) {
     if (!is_state(DataPackets::state::Fault)) {
         exit_state(VCU::operational_state);
         VCU::operational_state = DataPackets::state::Fault;
-        enter_state(DataPackets::state::Fault);
     }
     if (!FaultController::is_faulted()) {
         FAULT("%s", reason);
@@ -550,7 +532,8 @@ inline void handle_connected_orders() {
 }
 
 inline void handle_precharging() {
-    if (!is_state(DataPackets::state::Precharging)) return;
+    if (!is_state(DataPackets::state::Precharging))
+        return;
 
 #ifdef SINGLE
     if (VCU::contactors_closed) {
@@ -595,7 +578,8 @@ inline void handle_ready_orders() {
         return;
     }
 
-    if (OrderPackets::Static_Levitation_flag || OrderPackets::Static_Levitation_Parameterized_flag) {
+    if (OrderPackets::Static_Levitation_flag ||
+        OrderPackets::Static_Levitation_Parameterized_flag) {
         OrderPackets::Static_Levitation_flag = false;
         OrderPackets::Static_Levitation_Parameterized_flag = false;
         transition_to(DataPackets::state::Static_Levitation);
@@ -603,7 +587,8 @@ inline void handle_ready_orders() {
         return;
     }
 
-    if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
+    if (OrderPackets::Dynamic_Levitation_flag ||
+        OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
         transition_to(DataPackets::state::Dynamic_Levitation);
@@ -634,7 +619,8 @@ inline void handle_static_levitation_orders() {
         return;
     }
 
-    if (OrderPackets::Dynamic_Levitation_flag || OrderPackets::Dynamic_Levitation_Parameterized_flag) {
+    if (OrderPackets::Dynamic_Levitation_flag ||
+        OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
         transition_to(DataPackets::state::Dynamic_Levitation);
@@ -645,37 +631,67 @@ inline void handle_static_levitation_orders() {
 
 inline void clear_stale_order_flags() {
     if (OrderPackets::Maintenance_flag) {
-        reject_order(OrderPackets::Maintenance_flag, "Maintenance order rejected: not in Connected state");
+        reject_order(
+            OrderPackets::Maintenance_flag,
+            "Maintenance order rejected: not in Connected state"
+        );
     }
     if (OrderPackets::Precharge_flag) {
-        reject_order(OrderPackets::Precharge_flag, "Precharge order rejected: not in Connected state");
+        reject_order(
+            OrderPackets::Precharge_flag,
+            "Precharge order rejected: not in Connected state"
+        );
     }
     if (OrderPackets::Unbrake_flag) {
         reject_order(OrderPackets::Unbrake_flag, "Unbrake order rejected: not in HVActive state");
     }
     if (OrderPackets::Brake_flag) {
-        reject_order(OrderPackets::Brake_flag, "Brake order rejected: not in Ready or active movement state");
+        reject_order(
+            OrderPackets::Brake_flag,
+            "Brake order rejected: not in Ready or active movement state"
+        );
     }
     if (OrderPackets::Propulsion_flag) {
-        reject_order(OrderPackets::Propulsion_flag, "Propulsion order rejected: not in Ready state");
+        reject_order(
+            OrderPackets::Propulsion_flag,
+            "Propulsion order rejected: not in Ready state"
+        );
     }
     if (OrderPackets::Propulsion_Parameterized_flag) {
-        reject_order(OrderPackets::Propulsion_Parameterized_flag, "Propulsion order rejected: not in Ready state");
+        reject_order(
+            OrderPackets::Propulsion_Parameterized_flag,
+            "Propulsion order rejected: not in Ready state"
+        );
     }
     if (OrderPackets::Static_Levitation_flag) {
-        reject_order(OrderPackets::Static_Levitation_flag, "Static levitation order rejected: not in Ready state");
+        reject_order(
+            OrderPackets::Static_Levitation_flag,
+            "Static levitation order rejected: not in Ready state"
+        );
     }
     if (OrderPackets::Static_Levitation_Parameterized_flag) {
-        reject_order(OrderPackets::Static_Levitation_Parameterized_flag, "Static levitation order rejected: not in Ready state");
+        reject_order(
+            OrderPackets::Static_Levitation_Parameterized_flag,
+            "Static levitation order rejected: not in Ready state"
+        );
     }
     if (OrderPackets::Dynamic_Levitation_flag) {
-        reject_order(OrderPackets::Dynamic_Levitation_flag, "Dynamic levitation order rejected: not in Ready or Static_Levitation state");
+        reject_order(
+            OrderPackets::Dynamic_Levitation_flag,
+            "Dynamic levitation order rejected: not in Ready or Static_Levitation state"
+        );
     }
     if (OrderPackets::Dynamic_Levitation_Parameterized_flag) {
-        reject_order(OrderPackets::Dynamic_Levitation_Parameterized_flag, "Dynamic levitation order rejected: not in Ready or Static_Levitation state");
+        reject_order(
+            OrderPackets::Dynamic_Levitation_Parameterized_flag,
+            "Dynamic levitation order rejected: not in Ready or Static_Levitation state"
+        );
     }
     if (OrderPackets::Open_Contactors_flag) {
-        reject_order(OrderPackets::Open_Contactors_flag, "Open contactors order rejected: not in commandable state");
+        reject_order(
+            OrderPackets::Open_Contactors_flag,
+            "Open contactors order rejected: not in commandable state"
+        );
     }
 }
 
@@ -734,8 +750,14 @@ inline void start() {
         Detail::transition_to_fault("brakes are not deployed when the POD turns on");
     }
     Detail::refresh_connections();
-    Scheduler::register_task(100'000, +[]() { Detail::sample_inputs(); });
-    Scheduler::register_task(200'000, +[]() { Detail::update_status_leds(); });
+    Scheduler::register_task(
+        100'000,
+        +[]() { Detail::sample_inputs(); }
+    );
+    Scheduler::register_task(
+        200'000,
+        +[]() { Detail::update_status_leds(); }
+    );
 }
 
 inline void update() {

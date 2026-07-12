@@ -68,16 +68,21 @@ inline void init() {
 
     Diagnostics::install_ethernet_sink(vcu_socket);
 
-    new HeapOrder(903, +[]() {
-        nested_sm_state = HVBMS_State::Precharging;
-        nested_sm_state = HVBMS_State::Energized;
-    });
-    new HeapOrder(901, +[]() {
-        nested_sm_state = HVBMS_State::Idle;
-    });
-    new HeapOrder(0, +[]() {
-        nested_sm_state = HVBMS_State::Idle;
-    });
+    new HeapOrder(
+        903,
+        +[]() {
+            nested_sm_state = HVBMS_State::Precharging;
+            nested_sm_state = HVBMS_State::Energized;
+        }
+    );
+    new HeapOrder(
+        901,
+        +[]() { nested_sm_state = HVBMS_State::Idle; }
+    );
+    new HeapOrder(
+        0,
+        +[]() { nested_sm_state = HVBMS_State::Idle; }
+    );
 
     state_packet = new HeapPacket(
         static_cast<uint16_t>(950),
@@ -91,16 +96,18 @@ inline void init() {
         &nested_sm_state
     );
 
-    state_udp = new DatagramSocket(
-        "192.168.1.7", 50403, "192.168.1.3", 50403
+    state_udp = new DatagramSocket("192.168.1.7", 50403, "192.168.1.3", 50403);
+
+    Scheduler::register_task(
+        50'000,
+        +[]() { state_udp->send_packet(*state_packet); }
     );
 
-    Scheduler::register_task(50'000, +[]() {
-        state_udp->send_packet(*state_packet);
-    });
-
 #ifndef MOCK_NO_LEDS
-    Scheduler::register_task(200'000, +[]() { update_leds(); });
+    Scheduler::register_task(
+        200'000,
+        +[]() { update_leds(); }
+    );
 #endif
 }
 

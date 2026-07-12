@@ -1,9 +1,9 @@
 States: [IDLE, CONNECTED, MANTEINANCE, PRECHARGING, HV_ACTIVE, READY, PROPULSION, STATIC_LEVITATION, DYNAMIC_LEVITATION, FAULT]
 Initial state: IDLE
 Transitions:
-  IDLE: 
+  IDLE:
     CONNECTED: when we are connected to the control station and to all the boards we need to connect
-  CONNECTED: 
+  CONNECTED:
     MANTEINANCE: when an specific order arrives: MANTEINANCE
     PRECHARGING: when an specific order arrives: PRECHARGE
   MANTEINANCE:
@@ -20,7 +20,7 @@ Transitions:
     PROPULSION: when an specific order arrives: PROPULSION
     STATIC_LEVITATION: when an specific order arrives: STATIC_LEVITATION
     DYNAMIC_LEVITATION: when an specific order arrives: DYNAMIC_LEVITATION
-  STATIC_LEVITATION: 
+  STATIC_LEVITATION:
     HV_ACTIVE: when an specific order arrives: BRAKE, braking but keeping contactors closed
     DYNAMIC_LEVITATION: when an specific order arrives: DYNAMIC_LEVITATION
   PROPULSION:

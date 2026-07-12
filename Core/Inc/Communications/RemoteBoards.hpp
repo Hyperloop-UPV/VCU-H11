@@ -57,7 +57,6 @@ inline void reset_control_params() {
     levitation_target_height = 0.0f;
 }
 
-inline HeapOrder* FAULT_to_hvbms_order = nullptr;
 inline HeapOrder* Precharge_to_hvbms_order = nullptr;
 inline HeapOrder* Open_contactors_to_hvbms_order = nullptr;
 
@@ -68,7 +67,8 @@ inline HeapOrder* Stop_to_lcu_order = nullptr;
 inline HeapOrder* Levitate_to_lcu_order = nullptr;
 
 inline void init_remote_state_receivers() {
-    new HeapPacket(static_cast<uint16_t>(950),
+    new HeapPacket(
+        static_cast<uint16_t>(950),
         &hvbms_voltage_min,
         &hvbms_voltage_max,
         &hvbms_temp_min,
@@ -83,24 +83,37 @@ inline void init_remote_state_receivers() {
 }
 
 inline void init_remote_orders() {
-    FAULT_to_hvbms_order = new HeapOrder(0, +[]() {});
-    Precharge_to_hvbms_order = new HeapOrder(903, +[]() {});
-    Open_contactors_to_hvbms_order = new HeapOrder(901, +[]() {});
+    Precharge_to_hvbms_order = new HeapOrder(
+        903,
+        +[]() {}
+    );
+    Open_contactors_to_hvbms_order = new HeapOrder(
+        901,
+        +[]() {}
+    );
 
     Start_SVPWM_to_pcu_order = new HeapOrder(
-        507, +[]() {},
+        507,
+        +[]() {},
         &propulsion_target_speed,
         &propulsion_max_current,
         &pcu_start_svpwm_vref,
         &pcu_start_svpwm_vmax
     );
-    Stop_Motor_to_pcu_order = new HeapOrder(508, +[]() {});
+    Stop_Motor_to_pcu_order = new HeapOrder(
+        508,
+        +[]() {}
+    );
 
     Levitate_to_lcu_order = new HeapOrder(
-        9010, +[]() {},
+        9010,
+        +[]() {},
         &levitation_target_height
     );
-    Stop_to_lcu_order = new HeapOrder(9000, +[]() {});
+    Stop_to_lcu_order = new HeapOrder(
+        9000,
+        +[]() {}
+    );
 }
 
 } // namespace RemoteBoards

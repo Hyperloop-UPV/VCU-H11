@@ -33,8 +33,7 @@ using Board = ST_LIB::Board<
 #ifndef DISABLE_BRAKE_FAULT_PROTECTION
     brake_fault_protection,
 #endif
-    sdc_closed_protection
->;
+    sdc_closed_protection>;
 
 inline void init() {
     Board::init();
@@ -105,14 +104,31 @@ inline void init() {
     OrderPackets::Unbrake_init();
     OrderPackets::Open_Contactors_init();
 
-    OrderPackets::Propulsion_Parameterized_init(RemoteBoards::propulsion_target_speed, RemoteBoards::propulsion_max_current);
+    OrderPackets::Propulsion_Parameterized_init(
+        RemoteBoards::propulsion_target_speed,
+        RemoteBoards::propulsion_max_current
+    );
     OrderPackets::Static_Levitation_Parameterized_init(RemoteBoards::levitation_target_height);
-    OrderPackets::Dynamic_Levitation_Parameterized_init(RemoteBoards::propulsion_target_speed, RemoteBoards::propulsion_max_current, RemoteBoards::levitation_target_height);
+    OrderPackets::Dynamic_Levitation_Parameterized_init(
+        RemoteBoards::propulsion_target_speed,
+        RemoteBoards::propulsion_max_current,
+        RemoteBoards::levitation_target_height
+    );
 
     RemoteBoards::init_remote_orders();
 
     OrderPackets::start();
     DataPackets::start();
+
+    FaultController::register_fault_propagation(
+        OrderPackets::control_station_tcp,
+        OrderPackets::FAULT_order
+    );
+#ifndef SINGLE
+    FaultController::register_fault_propagation(OrderPackets::hvbms_tcp, OrderPackets::FAULT_order);
+    FaultController::register_fault_propagation(OrderPackets::pcu_tcp, OrderPackets::FAULT_order);
+    FaultController::register_fault_propagation(OrderPackets::lcu_tcp, OrderPackets::FAULT_order);
+#endif
 
     Diagnostics::install_ethernet_sink(OrderPackets::control_station_tcp);
 
