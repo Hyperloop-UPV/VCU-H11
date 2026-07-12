@@ -76,7 +76,7 @@ inline void handle_connection_change(
 }
 
 inline bool required_remote_peers_connected() {
-    return VCU::hvbms_connected && VCU::lcu_connected;
+    return VCU::hvbms_connected && VCU::lcu_connected && VCU::pcu_connected;
 }
 
 inline bool send_remote_order(auto* socket, HeapOrder* order, const char* description) {
@@ -320,7 +320,7 @@ inline bool verify_remote_states(DataPackets::state target) {
             return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating
                 && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
         case DataPackets::state::Connected:
-            return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Idle
+            return (RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Idle || RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Ready_To_Precharge)
                 && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Idle
                 && RemoteBoards::lcu_state == RemoteBoards::LCU_State::Idle;
         default:

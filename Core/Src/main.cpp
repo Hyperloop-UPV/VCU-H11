@@ -5,6 +5,11 @@
 using namespace ST_LIB;
 
 int main(void) {
+    for (volatile uint32_t i = 0; i < 25000000;) {
+        auto j = i;
+        i = j + 1;
+        __NOP();
+    }
     VCU::init();
 
     while (1) {
