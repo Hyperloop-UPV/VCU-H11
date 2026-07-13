@@ -14,7 +14,7 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     ST_LIB::EthernetDomain::PINSET_H10,
     "00:80:e1:00:01:03",
     "192.168.1.3",
-    "255.255.0.0"
+    "255.255.255.0"
 );
 #elif defined(USE_PHY_LAN8700)
 inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
@@ -28,7 +28,7 @@ inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     ST_LIB::EthernetDomain::PINSET_H11,
     "00:80:e1:00:01:03",
     "192.168.1.3",
-    "255.255.0.0"
+    "255.255.255.0"
 );
 #else
 #error "No PHY selected for Ethernet pinset selection"

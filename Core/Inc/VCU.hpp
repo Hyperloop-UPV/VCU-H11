@@ -93,6 +93,7 @@ inline void init() {
     led_fault->turn_off();
 
 #ifdef STLIB_ETH
+    DataPackets::Brakes_Deployed_init(brake_fault_detected);
     DataPackets::Outputs_init(
         cooling_pump_1_command,
         cooling_pump_2_command,
