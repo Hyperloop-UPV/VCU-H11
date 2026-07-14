@@ -61,7 +61,7 @@ inline auto& cooling_pump_1 = ST_LIB::PE13;
 inline auto& cooling_pump_2 = ST_LIB::PE14;
 inline auto& electrovalve = ST_LIB::PE15;
 inline auto& brake_reset = ST_LIB::PD15;
-inline auto& brake_fault = ST_LIB::PD14;
+inline auto& brakes_status_input = ST_LIB::PD14;
 
 } // namespace Pinout
 

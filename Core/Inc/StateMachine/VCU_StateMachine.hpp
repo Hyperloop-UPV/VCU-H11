@@ -32,8 +32,10 @@ inline void sample_inputs() {
 
     VCU::sdc_closed = VCU::sdc_closed_state == GPIO_PIN_SET;
 
-    if (VCU::brake_fault != nullptr) {
-        VCU::brake_fault_detected = VCU::brake_fault->read() == GPIO_PIN_SET;
+    if (VCU::brakes_status_input != nullptr) {
+        VCU::brakes_status = VCU::brakes_status_input->read() == GPIO_PIN_SET
+            ? VCU::BrakesStatus::UNBRAKED
+            : VCU::BrakesStatus::BRAKED;
     }
 }
 
@@ -746,7 +748,7 @@ inline void start() {
     VCU::operational_state = DataPackets::state::Idle;
     Detail::enter_state(DataPackets::state::Idle);
     Detail::sample_inputs();
-    if (VCU::brake_fault != nullptr && VCU::brake_fault->read() != GPIO_PIN_SET) {
+    if (VCU::brakes_status_input != nullptr && VCU::brakes_status_input->read() != GPIO_PIN_SET) {
         Detail::transition_to_fault("brakes are not deployed when the POD turns on");
     }
     Detail::refresh_connections();

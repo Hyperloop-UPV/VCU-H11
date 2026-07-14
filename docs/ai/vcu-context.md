@@ -28,7 +28,7 @@ Current H11 product state machine:
 - `Brake` is accepted from `Ready`, `Propulsion`, `StaticLevitation`, and `DynamicLevitation`. From active motion/levitation states it engages brakes and returns to `HVActive` while keeping contactors closed; active-mode exit actions still stop propulsion and/or levitation.
 - `Precharging` sends the HVBMS precharge request (order ID 903) through `hvbms_tcp`.
 - `Fault` is intentionally part of the current formal product state machine by explicit user request. ST-LIB protections and `FaultController` still provide the underlying fault trigger infrastructure.
-- Current protection/diagnostic policy: SDC open faults, control-station disconnect faults outside `Idle`, and high pressure below 50 bar emits a warning. Brake fault is currently sampled and published but temporarily does not fault the VCU while `DISABLE_BRAKE_FAULT_PROTECTION` is enabled for bench testing.
+- Current protection/diagnostic policy: SDC open faults, control-station disconnect faults outside `Idle`, and high pressure below 50 bar emits a warning. Brakes unbraked protection is currently sampled and published but temporarily does not fault the VCU while `DISABLE_BRAKE_UNBRAKED_PROTECTION` is enabled for bench testing.
 - `tapes_reached` protection and ADJ measurement removed entirely (no tape input pin on H11).
 - Flow sensors and NTC temperature sensors are not used in current firmware; their telemetry packets and sampling were removed from this version.
 
@@ -149,7 +149,7 @@ Current pinout naming examples:
 - `cooling_pump_1` and `cooling_pump_2`, not `bomba_*`
 - `electrovalve`, not `electrovalv`
 - `pressure_regulator_out`, not `regulador_*`
-- `brake_reset` and `brake_fault`
+- `brake_reset` and `brakes_status_input`
 - `ntc_temperature_1` and `ntc_temperature_2`
 - `sdc_closed`
 
@@ -168,7 +168,7 @@ The current pinout was extracted from `docs/VCU_H11G.zip`, specifically `MCU.Sch
 - `PA5`: ADC2 input for manual pressure regulator feedback sensing.
 - `PA6`: not used by H11 firmware for regulator control. H11 uses a manual pressure regulator that is not commanded by firmware.
 - `PF6`: EXTI6 input for `sdc_closed`.
-- `PD14`: digital input for `brake_fault`.
+- `PD14`: digital input for `brakes_status_input`.
 - `PD15`: digital output for `brake_reset`.
 - `PE13`: digital output for `cooling_pump_1`.
 - `PE14`: digital output for `cooling_pump_2`.
@@ -209,7 +209,7 @@ Current firmware-facing pin aliases:
 | `electrovalve` | `PE15` |
 | `pressure_regulator_out` | `PA5` |
 | `brake_reset` | `PD15` |
-| `brake_fault` | `PD14` |
+| `brakes_status_input` | `PD14` |
 
 H11 does not use firmware-controlled pressure regulation. Do not request `PA6` / `TIM13_CH1` as a regulator PWM device, do not expose a set-regulator order, and do not publish commanded regulator duty. The pressure regulator is manual; firmware may only observe its feedback through `pressure_regulator_out` on `PA5` / `ADC2_INP19`.
 

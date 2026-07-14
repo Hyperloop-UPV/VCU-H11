@@ -14,6 +14,8 @@
 
 namespace VCU {
 
+enum class BrakesStatus : uint8_t { BRAKED, UNBRAKED };
+
 #if defined(USE_PHY_LAN8742)
 inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     ST_LIB::EthernetDomain::PINSET_H10,
@@ -62,8 +64,8 @@ inline constexpr auto electrovalve_req =
 inline constexpr auto brake_reset_req =
     ST_LIB::DigitalOutputDomain::DigitalOutput(Pinout::brake_reset);
 
-inline constexpr auto brake_fault_req =
-    ST_LIB::DigitalInputDomain::DigitalInput(Pinout::brake_fault);
+inline constexpr auto brakes_status_req =
+    ST_LIB::DigitalInputDomain::DigitalInput(Pinout::brakes_status_input);
 
 inline void on_sdc_closed_edge() {}
 
@@ -140,7 +142,7 @@ inline ST_LIB::DigitalOutputDomain::Instance* cooling_pump_2 = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* electrovalve = nullptr;
 inline ST_LIB::DigitalOutputDomain::Instance* brake_reset = nullptr;
 
-inline ST_LIB::DigitalInputDomain::Instance* brake_fault = nullptr;
+inline ST_LIB::DigitalInputDomain::Instance* brakes_status_input = nullptr;
 inline ST_LIB::EXTIDomain::Instance* sdc_closed_interrupt = nullptr;
 
 inline constexpr float uncalibrated_linear_gain = 1.0f;
@@ -158,7 +160,7 @@ inline float ntc_temperature_1 = 0.0f;
 inline float ntc_temperature_2 = 0.0f;
 inline GPIO_PinState sdc_closed_state = GPIO_PIN_RESET;
 inline bool sdc_closed = false;
-inline bool brake_fault_detected = false;
+inline BrakesStatus brakes_status = BrakesStatus::BRAKED;
 inline bool contactors_closed = false;
 inline bool active_brakes = true;
 inline bool recovery_requested = false;
@@ -185,9 +187,9 @@ inline constexpr auto sdc_closed_protection = Protections::protection<"SDC", sdc
     Protections::Rules::equals(false)
 );
 
-inline constexpr auto brake_fault_protection =
-    Protections::protection<"brake_fault", brake_fault_detected>(
-        Protections::Rules::equals(true)
+inline constexpr auto brakes_unbraked_protection =
+    Protections::protection<"brakes_unbraked", brakes_status>(
+        Protections::Rules::equals(BrakesStatus::UNBRAKED)
     );
 
 inline void engage_brake() {

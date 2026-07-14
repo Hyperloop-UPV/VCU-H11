@@ -9,7 +9,7 @@ state and telemetry value.
 | Trigger | Type | Behavior |
 | --- | --- | --- |
 | `sdc_closed == false` | ST-LIB protection and FSM check | Enters `Fault`. |
-| `brake_fault_detected == true` | ST-LIB protection and FSM check | Enters `Fault`. |
+| `brakes_status == UNBRAKED` | ST-LIB protection and FSM check | Enters `Fault`. |
 | `tapes_reached == true` | ST-LIB protection and FSM check | Enters `Fault`. |
 | Control station disconnect after required peers were connected | FSM check | Enters `Fault` outside `Idle`. |
 | `FAULT` order | Operator/order path | Enters `Fault` and propagates fault. |
@@ -50,7 +50,7 @@ an input/protection, not as a controllable output.
 ## Open Safety Work
 
 - Wire the real tape/end-of-track source into `tapes_reached`.
-- Confirm active levels for `brake_fault`, `sdc_closed`, and the future tape
+- Confirm active levels for `brakes_status`, `sdc_closed`, and the future tape
   signal on hardware.
 - Define pressure, temperature, flow, and remote-acknowledgement thresholds if
   they should become warnings or faults.

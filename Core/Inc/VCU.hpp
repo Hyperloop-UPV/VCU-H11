@@ -23,15 +23,15 @@ using Board = ST_LIB::Board<
     cooling_pump_2_req,
     electrovalve_req,
     brake_reset_req,
-    brake_fault_req,
+    brakes_status_req,
     sdc_closed_req,
     high_pressure_adc_req,
     low_pressure_adc_req,
     pressure_regulator_out_adc_req,
     ntc_temperature_1_adc_req,
     ntc_temperature_2_adc_req,
-#ifndef DISABLE_BRAKE_FAULT_PROTECTION
-    brake_fault_protection,
+#ifndef DISABLE_BRAKE_UNBRAKED_PROTECTION
+    brakes_unbraked_protection,
 #endif
     sdc_closed_protection>;
 
@@ -51,7 +51,7 @@ inline void init() {
     cooling_pump_2 = &Board::instance_of<cooling_pump_2_req>();
     electrovalve = &Board::instance_of<electrovalve_req>();
     brake_reset = &Board::instance_of<brake_reset_req>();
-    brake_fault = &Board::instance_of<brake_fault_req>();
+    brakes_status_input = &Board::instance_of<brakes_status_req>();
     sdc_closed_interrupt = &Board::instance_of<sdc_closed_req>();
 
     high_pressure_sensor = LinearSensor<float>(
@@ -87,7 +87,7 @@ inline void init() {
 
     DataPackets::VCU_State_init(operational_state);
     DataPackets::Pressures_init(high_pressure, low_pressure, pressure_regulator_out);
-    DataPackets::Brake_Status_init(active_brakes, brake_fault_detected);
+    DataPackets::Brake_Status_init(active_brakes, reinterpret_cast<uint8_t&>(brakes_status));
     DataPackets::Outputs_init(electrovalve_enabled);
     DataPackets::Safety_init(sdc_closed, hvbms_connected, pcu_connected, lcu_connected);
 

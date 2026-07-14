@@ -66,10 +66,10 @@ context:
       access: read
       initial_value: false
 
-    - name: brake_fault_detected
-      type: bool
+    - name: brakes_status
+      type: BrakesStatus
       access: read
-      initial_value: false
+      initial_value: BRAKED
 
     - name: tapes_reached
       type: bool
@@ -251,10 +251,10 @@ guards:
     description: Temporary implementation guard for HVBMS precharge completion.
 
   - name: protection_active
-    expression: sdc_closed == false || brake_fault_detected == true || tapes_reached == true
+    expression: sdc_closed == false || brakes_status == UNBRAKED || tapes_reached == true
     dependencies:
       - sdc_closed
-      - brake_fault_detected
+      - brakes_status
       - tapes_reached
 
   - name: high_pressure_below_warning_threshold
