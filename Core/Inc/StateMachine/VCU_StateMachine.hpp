@@ -27,7 +27,7 @@ inline void sample_inputs() {
     VCU::sdc_closed = VCU::sdc_closed_state == GPIO_PIN_SET;
 
     if (VCU::brake_fault != nullptr) {
-        VCU::brake_fault_detected = VCU::brake_fault->read() == GPIO_PIN_SET;
+        VCU::brake_fault_detected = VCU::brake_fault->read() == GPIO_PIN_RESET;
     }
     if (VCU::sdmmc_card_detect != nullptr) {
         VCU::sdmmc_card_detected = VCU::sdmmc_card_detect->read() == GPIO_PIN_SET;
