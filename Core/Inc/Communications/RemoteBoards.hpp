@@ -3,6 +3,9 @@
 #include "ST-LIB.hpp"
 
 #include <cstdint>
+#include <cstdlib>
+
+extern "C" const char ADJ_COMMIT_HASH[16];
 
 void keepalive_timeout_trigger();
 
@@ -71,6 +74,12 @@ inline HeapOrder* Levitate_to_lcu_order = nullptr;
 inline uint16_t keepalive_timeout_id = Scheduler::INVALID_ID;
 inline HeapOrder* keepalive_order = nullptr;
 
+inline uint64_t adj_commit_hash_value = 0;
+inline uint64_t adj_hash_on_wire = 0;
+inline bool adj_hash_verified = false;
+inline bool adj_hashes_sent = false;
+inline HeapOrder* adj_hash_order = nullptr;
+
 inline void init_remote_state_receivers() {
     new HeapPacket(
         static_cast<uint16_t>(950),
@@ -128,6 +137,17 @@ inline void init_remote_orders() {
             keepalive_timeout_trigger();
         });
     });
+
+    adj_commit_hash_value = strtoull(ADJ_COMMIT_HASH, nullptr, 16);
+    adj_hash_order = new HeapOrder(65535, +[]() {
+        if (adj_hash_on_wire != adj_commit_hash_value) {
+            if (!FaultController::is_faulted()) {
+                FAULT("ADJ hashes don't match");
+            }
+        } else {
+            adj_hash_verified = true;
+        }
+    }, &adj_hash_on_wire);
 }
 
 } // namespace RemoteBoards

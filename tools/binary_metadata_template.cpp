@@ -12,7 +12,7 @@ extern "C"{
         "4b8ea8bb";
 
     // 16 bytes because short hash is 8 bytes + null terminator + alignment
-    const char ADJ_COMMIT_HASH[16] __attribute__((section(".metadata_pool")))=
+    extern const char ADJ_COMMIT_HASH[16] __attribute__((section(".metadata_pool")))=
         "4ede3eb3";
 
     // 16 bytes because short hash is 8 bytes + null terminator + alignment

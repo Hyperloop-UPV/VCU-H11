@@ -3,13 +3,24 @@
 * DO NOT MODIFY MANUALLY!!!
 */
 extern "C"{
+    // about 30 is the maximum but do 32 for alignment
+    const char COMPILATION_DATE[32] __attribute__((section(".metadata_pool")))=
+        "20260715T121909";
+
+    // 16 bytes because short hash is 8 bytes + null terminator + alignment
+    const char STLIB_COMMIT_HASH[16] __attribute__((section(".metadata_pool")))=
+        "4b8ea8bb";
+
+    // 16 bytes because short hash is 8 bytes + null terminator + alignment
+    extern const char ADJ_COMMIT_HASH[16] __attribute__((section(".metadata_pool")))=
+        "4ede3eb3";
+
+    // 16 bytes because short hash is 8 bytes + null terminator + alignment
+    const char BOARD_COMMIT_HASH[16] __attribute__((section(".metadata_pool")))=
+        "55ac2426";
+
     const char DESCRIPTION[255]  __attribute__((section(".metadata_pool")))=
         "****************"  // placeholder for beggining
-        "20260709T164251"   // DateTime using ISO-8601 format
-        " "                 // alignment
-        "32d01214"          // STLIB commit
-        "--------"          // ADJ commit
-        "f65b24da"          // Board commit
         // the '=' is used for unparsing
         ;
 }

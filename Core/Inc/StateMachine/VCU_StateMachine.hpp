@@ -159,7 +159,13 @@ inline void refresh_connections() {
         VCU::control_station_connected && required_remote_peers_connected();
 #endif
 
+    bool hvbms_just_connected = VCU::hvbms_connected && !VCU::hvbms_was_connected;
+    bool pcu_just_connected = VCU::pcu_connected && !VCU::pcu_was_connected;
+    bool lcu_just_connected = VCU::lcu_connected && !VCU::lcu_was_connected;
+
     if (VCU::control_station_connected && !VCU::control_station_was_connected) {
+        RemoteBoards::adj_hash_verified = false;
+        RemoteBoards::adj_hashes_sent = false;
         if (RemoteBoards::keepalive_timeout_id != Scheduler::INVALID_ID) {
             Scheduler::cancel_timeout(RemoteBoards::keepalive_timeout_id);
         }
@@ -183,6 +189,37 @@ inline void refresh_connections() {
     );
     handle_connection_change(VCU::pcu_connected, VCU::pcu_was_connected, "PCU", "PCU disconnected");
     handle_connection_change(VCU::lcu_connected, VCU::lcu_was_connected, "LCU", "LCU disconnected");
+
+    if (RemoteBoards::adj_hash_verified) {
+        if (hvbms_just_connected) {
+            RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
+            send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::adj_hash_order, "ADJ hash to HVBMS");
+        }
+        if (pcu_just_connected) {
+            RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
+            send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to PCU");
+        }
+        if (lcu_just_connected) {
+            RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
+            send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to LCU");
+        }
+
+        if (!RemoteBoards::adj_hashes_sent) {
+            if (VCU::hvbms_connected) {
+                RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
+                send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::adj_hash_order, "ADJ hash to HVBMS");
+            }
+            if (VCU::pcu_connected) {
+                RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
+                send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to PCU");
+            }
+            if (VCU::lcu_connected) {
+                RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
+                send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to LCU");
+            }
+            RemoteBoards::adj_hashes_sent = true;
+        }
+    }
 #else
     VCU::hvbms_was_connected = false;
     VCU::pcu_was_connected = false;
@@ -474,8 +511,15 @@ inline void reject_order(bool& flag, const char* message) {
 }
 
 inline void handle_connection_transition() {
-    if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected) {
+    if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected
+        && RemoteBoards::adj_hash_verified) {
+#ifdef SINGLE
         transition_to(DataPackets::state::Connected);
+#else
+        if (RemoteBoards::adj_hashes_sent) {
+            transition_to(DataPackets::state::Connected);
+        }
+#endif
     }
 }
 
