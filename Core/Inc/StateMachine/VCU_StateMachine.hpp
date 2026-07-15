@@ -35,8 +35,8 @@ inline void sample_inputs() {
     if (VCU::brakes_status_input != nullptr) {
         bool pin_set = VCU::brakes_status_input->read() == GPIO_PIN_SET;
         VCU::brakes_status = pin_set
-            ? DataPackets::brakes_status::BRAKED
-            : DataPackets::brakes_status::UNBRAKED;
+            ? DataPackets::brakes_status::UNBRAKED
+            : DataPackets::brakes_status::BRAKED;
         VCU::brakes_unbraked = pin_set;
     }
 }
