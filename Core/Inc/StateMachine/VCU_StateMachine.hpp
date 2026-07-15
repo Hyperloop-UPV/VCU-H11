@@ -33,9 +33,11 @@ inline void sample_inputs() {
     VCU::sdc_closed = VCU::sdc_closed_state == GPIO_PIN_SET;
 
     if (VCU::brakes_status_input != nullptr) {
-        VCU::brakes_status = VCU::brakes_status_input->read() == GPIO_PIN_SET
-            ? VCU::BrakesStatus::UNBRAKED
-            : VCU::BrakesStatus::BRAKED;
+        bool pin_set = VCU::brakes_status_input->read() == GPIO_PIN_SET;
+        VCU::brakes_status = pin_set
+            ? DataPackets::brakes_status::UNBRAKED
+            : DataPackets::brakes_status::BRAKED;
+        VCU::brakes_unbraked = pin_set;
     }
 }
 

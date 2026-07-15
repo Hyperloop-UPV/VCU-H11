@@ -87,7 +87,7 @@ inline void init() {
 
     DataPackets::VCU_State_init(operational_state);
     DataPackets::Pressures_init(high_pressure, low_pressure, pressure_regulator_out);
-    DataPackets::Brake_Status_init(active_brakes, reinterpret_cast<uint8_t&>(brakes_status));
+    DataPackets::Brake_Status_init(active_brakes, brakes_status);
     DataPackets::Outputs_init(electrovalve_enabled);
     DataPackets::Safety_init(sdc_closed, hvbms_connected, pcu_connected, lcu_connected);
 

@@ -14,8 +14,6 @@
 
 namespace VCU {
 
-enum class BrakesStatus : uint8_t { BRAKED, UNBRAKED };
-
 #if defined(USE_PHY_LAN8742)
 inline constexpr auto eth = ST_LIB::EthernetDomain::Ethernet(
     ST_LIB::EthernetDomain::PINSET_H10,
@@ -160,7 +158,8 @@ inline float ntc_temperature_1 = 0.0f;
 inline float ntc_temperature_2 = 0.0f;
 inline GPIO_PinState sdc_closed_state = GPIO_PIN_RESET;
 inline bool sdc_closed = false;
-inline BrakesStatus brakes_status = BrakesStatus::BRAKED;
+inline DataPackets::brakes_status brakes_status = DataPackets::brakes_status::BRAKED;
+inline bool brakes_unbraked = false;
 inline bool contactors_closed = false;
 inline bool active_brakes = true;
 inline bool recovery_requested = false;
@@ -188,8 +187,8 @@ inline constexpr auto sdc_closed_protection = Protections::protection<"SDC", sdc
 );
 
 inline constexpr auto brakes_unbraked_protection =
-    Protections::protection<"brakes_unbraked", brakes_status>(
-        Protections::Rules::equals(BrakesStatus::UNBRAKED)
+    Protections::protection<"brakes_unbraked", brakes_unbraked>(
+        Protections::Rules::equals(true)
     );
 
 inline void engage_brake() {
