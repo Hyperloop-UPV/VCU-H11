@@ -166,12 +166,14 @@ inline void refresh_connections() {
     if (VCU::control_station_connected && !VCU::control_station_was_connected) {
         RemoteBoards::adj_hash_verified = false;
         RemoteBoards::adj_hashes_sent = false;
+#ifdef CUSTOM_KEEPALIVE
         if (RemoteBoards::keepalive_timeout_id != Scheduler::INVALID_ID) {
             Scheduler::cancel_timeout(RemoteBoards::keepalive_timeout_id);
         }
         RemoteBoards::keepalive_timeout_id = Scheduler::set_timeout(100'000, +[]() {
             keepalive_timeout_trigger();
         });
+#endif
     }
 
     handle_connection_change(

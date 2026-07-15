@@ -34,6 +34,7 @@ option(USE_ETHERNET "Enable ethernet peripheral" OFF)
 option(SINGLE "Build VCU for single-board testing without remote-board sockets" OFF)
 option(TARGET_NUCLEO "Targets the STM32H723 Nucleo development board" OFF)
 option(DISABLE_BRAKE_UNBRAKED_PROTECTION "Temporarily disable brakes unbraked protection for bench testing" ON)
+option(CUSTOM_KEEPALIVE "Enable custom keepalive watchdog over order ID 1" OFF)
 option(USE_CCACHE "Use ccache if available" ON)
 if(NOT USE_ETHERNET)
   message(FATAL_ERROR "VCU-H11 requires Ethernet. Use an Ethernet preset such as board-debug-eth-ksz8041.")
@@ -63,6 +64,7 @@ message(STATUS "VCU-H11: TARGET_NUCLEO        = ${TARGET_NUCLEO}")
 message(STATUS "VCU-H11: BOARD_NAME           = ${BOARD_NAME}")
 message(STATUS "VCU-H11: VCU_APP_TARGET       = ${VCU_APP_TARGET}")
 message(STATUS "VCU-H11: DISABLE_BRAKE_UNBRAKED_PROTECTION = ${DISABLE_BRAKE_UNBRAKED_PROTECTION}")
+message(STATUS "VCU-H11: CUSTOM_KEEPALIVE  = ${CUSTOM_KEEPALIVE}")
 
 set(VCU_MASTER_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/main.cpp)
 set(VCU_HVBMS_MOCK_MAIN_SOURCE ${CMAKE_SOURCE_DIR}/Core/Src/Mocks/hvbms_mock_main.cpp)
@@ -174,6 +176,7 @@ if(CMAKE_CROSSCOMPILING)
     $<$<BOOL:${USE_ETHERNET}>:STLIB_ETH>
     $<$<BOOL:${SINGLE}>:SINGLE>
     $<$<BOOL:${DISABLE_BRAKE_UNBRAKED_PROTECTION}>:DISABLE_BRAKE_UNBRAKED_PROTECTION>
+    $<$<BOOL:${CUSTOM_KEEPALIVE}>:CUSTOM_KEEPALIVE>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,NUCLEO,BOARD>
     $<IF:$<BOOL:${TARGET_NUCLEO}>,HSE_VALUE=8000000,HSE_VALUE=25000000>
     VCU_MOCK_MASTER_TCP_PORT=${VCU_MOCK_MASTER_TCP_PORT}

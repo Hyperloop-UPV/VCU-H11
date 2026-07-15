@@ -7,7 +7,9 @@
 
 extern "C" const char ADJ_COMMIT_HASH[16];
 
+#ifdef CUSTOM_KEEPALIVE
 void keepalive_timeout_trigger();
+#endif
 
 namespace RemoteBoards {
 
@@ -71,8 +73,10 @@ inline HeapOrder* Start_SVPWM_to_pcu_order = nullptr;
 inline HeapOrder* Stop_to_lcu_order = nullptr;
 inline HeapOrder* Levitate_to_lcu_order = nullptr;
 
+#ifdef CUSTOM_KEEPALIVE
 inline uint16_t keepalive_timeout_id = Scheduler::INVALID_ID;
 inline HeapOrder* keepalive_order = nullptr;
+#endif
 
 inline uint64_t adj_commit_hash_value = 0;
 inline uint64_t adj_hash_on_wire = 0;
@@ -129,6 +133,7 @@ inline void init_remote_orders() {
         +[]() {}
     );
 
+#ifdef CUSTOM_KEEPALIVE
     keepalive_order = new HeapOrder(1, +[]() {
         if (keepalive_timeout_id != Scheduler::INVALID_ID) {
             Scheduler::cancel_timeout(keepalive_timeout_id);
@@ -137,6 +142,7 @@ inline void init_remote_orders() {
             keepalive_timeout_trigger();
         });
     });
+#endif
 
     adj_commit_hash_value = strtoull(ADJ_COMMIT_HASH, nullptr, 16);
     adj_hash_order = new HeapOrder(65535, +[]() {
