@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+void keepalive_timeout_trigger();
+
 namespace RemoteBoards {
 
 enum class HVBMS_State : uint8_t {
@@ -66,6 +68,9 @@ inline HeapOrder* Start_SVPWM_to_pcu_order = nullptr;
 inline HeapOrder* Stop_to_lcu_order = nullptr;
 inline HeapOrder* Levitate_to_lcu_order = nullptr;
 
+inline uint16_t keepalive_timeout_id = Scheduler::INVALID_ID;
+inline HeapOrder* keepalive_order = nullptr;
+
 inline void init_remote_state_receivers() {
     new HeapPacket(
         static_cast<uint16_t>(950),
@@ -114,6 +119,15 @@ inline void init_remote_orders() {
         9000,
         +[]() {}
     );
+
+    keepalive_order = new HeapOrder(1, +[]() {
+        if (keepalive_timeout_id != Scheduler::INVALID_ID) {
+            Scheduler::cancel_timeout(keepalive_timeout_id);
+        }
+        keepalive_timeout_id = Scheduler::set_timeout(100'000, +[]() {
+            keepalive_timeout_trigger();
+        });
+    });
 }
 
 } // namespace RemoteBoards

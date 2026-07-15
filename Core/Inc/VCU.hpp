@@ -119,6 +119,7 @@ inline void init() {
 
     OrderPackets::start();
     DataPackets::start();
+    OrderPackets::control_station_tcp->keepalive_config.inactivity_time_until_keepalive_ms = 3000;
 
     FaultController::register_fault_propagation(
         OrderPackets::control_station_tcp,

@@ -159,6 +159,15 @@ inline void refresh_connections() {
         VCU::control_station_connected && required_remote_peers_connected();
 #endif
 
+    if (VCU::control_station_connected && !VCU::control_station_was_connected) {
+        if (RemoteBoards::keepalive_timeout_id != Scheduler::INVALID_ID) {
+            Scheduler::cancel_timeout(RemoteBoards::keepalive_timeout_id);
+        }
+        RemoteBoards::keepalive_timeout_id = Scheduler::set_timeout(100'000, +[]() {
+            keepalive_timeout_trigger();
+        });
+    }
+
     handle_connection_change(
         VCU::control_station_connected,
         VCU::control_station_was_connected,

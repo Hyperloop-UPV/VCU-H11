@@ -245,4 +245,10 @@ inline void on_fault_enter() {
 
 } // namespace VCU
 
+inline void keepalive_timeout_trigger() {
+    if (!FaultController::is_faulted()) {
+        FAULT("Keepalive timeout");
+    }
+}
+
 #endif // VCU_TYPES_HPP
