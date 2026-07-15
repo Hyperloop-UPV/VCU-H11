@@ -123,7 +123,7 @@ inline constexpr auto ntc_temperature_2_adc_req = ST_LIB::ADCDomain::ADC(
     ntc_adc_prescaler
 );
 
-inline constexpr uint32_t remote_ack_timeout_us = 100'000;
+inline constexpr uint32_t remote_ack_timeout_us = 1'000'000;
 inline constexpr uint32_t contactor_ack_timeout_us = 6'000'000;
 
 inline DataPackets::state operational_state = DataPackets::state::Idle;

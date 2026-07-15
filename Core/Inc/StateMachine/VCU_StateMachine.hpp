@@ -159,13 +159,17 @@ inline void refresh_connections() {
         VCU::control_station_connected && required_remote_peers_connected();
 #endif
 
+#ifdef ADJ_COMMIT_VALIDATION
     bool hvbms_just_connected = VCU::hvbms_connected && !VCU::hvbms_was_connected;
     bool pcu_just_connected = VCU::pcu_connected && !VCU::pcu_was_connected;
     bool lcu_just_connected = VCU::lcu_connected && !VCU::lcu_was_connected;
+#endif
 
     if (VCU::control_station_connected && !VCU::control_station_was_connected) {
+#ifdef ADJ_COMMIT_VALIDATION
         RemoteBoards::adj_hash_verified = false;
         RemoteBoards::adj_hashes_sent = false;
+#endif
 #ifdef CUSTOM_KEEPALIVE
         if (RemoteBoards::keepalive_timeout_id != Scheduler::INVALID_ID) {
             Scheduler::cancel_timeout(RemoteBoards::keepalive_timeout_id);
@@ -192,6 +196,7 @@ inline void refresh_connections() {
     handle_connection_change(VCU::pcu_connected, VCU::pcu_was_connected, "PCU", "PCU disconnected");
     handle_connection_change(VCU::lcu_connected, VCU::lcu_was_connected, "LCU", "LCU disconnected");
 
+#ifdef ADJ_COMMIT_VALIDATION
     if (RemoteBoards::adj_hash_verified) {
         if (hvbms_just_connected) {
             RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
@@ -222,6 +227,7 @@ inline void refresh_connections() {
             RemoteBoards::adj_hashes_sent = true;
         }
     }
+#endif
 #else
     VCU::hvbms_was_connected = false;
     VCU::pcu_was_connected = false;
@@ -513,6 +519,7 @@ inline void reject_order(bool& flag, const char* message) {
 }
 
 inline void handle_connection_transition() {
+#ifdef ADJ_COMMIT_VALIDATION
     if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected
         && RemoteBoards::adj_hash_verified) {
 #ifdef SINGLE
@@ -523,6 +530,11 @@ inline void handle_connection_transition() {
         }
 #endif
     }
+#else
+    if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected) {
+        transition_to(DataPackets::state::Connected);
+    }
+#endif
 }
 
 inline void handle_fault_orders() {
