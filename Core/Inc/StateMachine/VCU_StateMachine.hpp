@@ -35,8 +35,8 @@ inline void sample_inputs() {
     if (VCU::brakes_status_input != nullptr) {
         bool pin_set = VCU::brakes_status_input->read() == GPIO_PIN_SET;
         VCU::brakes_status = pin_set
-            ? DataPackets::brakes_status::UNBRAKED
-            : DataPackets::brakes_status::BRAKED;
+            ? DataPackets::brakes_status::BRAKED
+            : DataPackets::brakes_status::UNBRAKED;
         VCU::brakes_unbraked = pin_set;
     }
 }
@@ -803,7 +803,7 @@ inline void start() {
     VCU::operational_state = DataPackets::state::Idle;
     Detail::enter_state(DataPackets::state::Idle);
     Detail::sample_inputs();
-    if (VCU::brakes_status_input != nullptr && VCU::brakes_status_input->read() != GPIO_PIN_SET) {
+    if (VCU::brakes_status_input != nullptr && VCU::brakes_status_input->read() == GPIO_PIN_SET) {
         Detail::transition_to_fault("brakes are not deployed when the POD turns on");
     }
     Detail::refresh_connections();
