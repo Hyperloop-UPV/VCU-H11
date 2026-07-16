@@ -202,7 +202,7 @@ inline void refresh_connections() {
             Scheduler::cancel_timeout(RemoteBoards::keepalive_timeout_id);
         }
         RemoteBoards::keepalive_timeout_id = Scheduler::set_timeout(
-            100'000,
+            500'000,
             +[]() { keepalive_timeout_trigger(); }
         );
 #endif

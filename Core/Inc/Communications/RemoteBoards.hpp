@@ -68,8 +68,7 @@ inline float hvbms_voltage_reading = 0.0f;
 inline float hvbms_batteries_voltage = 0.0f;
 #endif
 
-inline float propulsion_target_speed = 0.0f;
-inline float propulsion_max_current = 0.0f;
+inline float propulsion_current_reference = 0.0f;
 inline float levitation_target_height = 0.0f;
 
 #ifdef ENABLE_PCU
@@ -78,8 +77,7 @@ inline float pcu_start_svpwm_vmax = 0.0f;
 #endif
 
 inline void reset_control_params() {
-    propulsion_target_speed = 0.0f;
-    propulsion_max_current = 0.0f;
+    propulsion_current_reference= 0.0f;
     levitation_target_height = 0.0f;
 }
 
@@ -151,13 +149,14 @@ inline void init_remote_orders() {
 #endif
 
 #ifdef ENABLE_PCU
-    Start_SVPWM_to_pcu_order = new HeapOrder(
-        507,
+    current_control_order = new HeapOrder(
+        509,
         +[]() {},
-        &propulsion_target_speed,
-        &propulsion_max_current,
-        &pcu_start_svpwm_vref,
-        &pcu_start_svpwm_vmax
+        0,
+        30000,
+        &propulsion_current_reference,
+        &hvbms_current_reading,
+        true
     );
     Stop_Motor_to_pcu_order = new HeapOrder(
         508,
