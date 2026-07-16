@@ -126,9 +126,15 @@ inline void init() {
         OrderPackets::FAULT_order
     );
 #ifndef SINGLE
+#ifdef ENABLE_HVBMS
     FaultController::register_fault_propagation(OrderPackets::hvbms_tcp, OrderPackets::FAULT_order);
+#endif
+#ifdef ENABLE_PCU
     FaultController::register_fault_propagation(OrderPackets::pcu_tcp, OrderPackets::FAULT_order);
+#endif
+#ifdef ENABLE_LCU
     FaultController::register_fault_propagation(OrderPackets::lcu_tcp, OrderPackets::FAULT_order);
+#endif
 #endif
 
     Diagnostics::install_ethernet_sink(OrderPackets::control_station_tcp);

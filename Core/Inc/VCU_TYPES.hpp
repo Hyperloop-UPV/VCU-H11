@@ -208,11 +208,13 @@ inline void release_brake() {
 inline void request_open_contactors() {
 #ifdef SINGLE
     contactors_closed = false;
-#else
+#elif defined(ENABLE_HVBMS)
     if (OrderPackets::hvbms_tcp != nullptr && OrderPackets::hvbms_tcp->is_connected() &&
         RemoteBoards::Open_contactors_to_hvbms_order != nullptr) {
         OrderPackets::hvbms_tcp->send_order(*RemoteBoards::Open_contactors_to_hvbms_order);
     }
+    contactors_closed = false;
+#else
     contactors_closed = false;
 #endif
 }

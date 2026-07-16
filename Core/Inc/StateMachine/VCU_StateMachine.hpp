@@ -76,7 +76,17 @@ inline void handle_connection_change(
 }
 
 inline bool required_remote_peers_connected() {
-    return VCU::hvbms_connected && VCU::lcu_connected && VCU::pcu_connected;
+    bool ok = true;
+#ifdef ENABLE_HVBMS
+    ok = ok && VCU::hvbms_connected;
+#endif
+#ifdef ENABLE_LCU
+    ok = ok && VCU::lcu_connected;
+#endif
+#ifdef ENABLE_PCU
+    ok = ok && VCU::pcu_connected;
+#endif
+    return ok;
 }
 
 inline bool send_remote_order(auto* socket, HeapOrder* order, const char* description) {
@@ -98,13 +108,13 @@ inline bool send_remote_order(auto* socket, HeapOrder* order, const char* descri
 inline void request_precharge() {
 #ifdef SINGLE
     VCU::contactors_closed = true;
-#else
+#elif defined(ENABLE_HVBMS)
     send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::Precharge_to_hvbms_order, "precharge");
 #endif
 }
 
 inline void stop_propulsion() {
-#ifndef SINGLE
+#if !defined(SINGLE) && defined(ENABLE_PCU)
     send_remote_order(
         OrderPackets::pcu_tcp,
         RemoteBoards::Stop_Motor_to_pcu_order,
@@ -114,19 +124,19 @@ inline void stop_propulsion() {
 }
 
 inline void stop_levitation() {
-#ifndef SINGLE
+#if !defined(SINGLE) && defined(ENABLE_LCU)
     send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::Stop_to_lcu_order, "stop levitation");
 #endif
 }
 
 inline void start_propulsion() {
-#ifndef SINGLE
+#if !defined(SINGLE) && defined(ENABLE_PCU)
     send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::Start_SVPWM_to_pcu_order, "propulsion");
 #endif
 }
 
 inline void start_static_levitation() {
-#ifndef SINGLE
+#if !defined(SINGLE) && defined(ENABLE_LCU)
     send_remote_order(
         OrderPackets::lcu_tcp,
         RemoteBoards::Levitate_to_lcu_order,
@@ -148,21 +158,39 @@ inline void refresh_connections() {
     VCU::lcu_connected = false;
     VCU::required_peers_connected = VCU::control_station_connected;
 #else
+#ifdef ENABLE_HVBMS
     reconnect_if_needed(OrderPackets::hvbms_tcp);
+#endif
+#ifdef ENABLE_PCU
     reconnect_if_needed(OrderPackets::pcu_tcp);
+#endif
+#ifdef ENABLE_LCU
     reconnect_if_needed(OrderPackets::lcu_tcp);
+#endif
 
+#ifdef ENABLE_HVBMS
     VCU::hvbms_connected = socket_connected(OrderPackets::hvbms_tcp);
+#endif
+#ifdef ENABLE_PCU
     VCU::pcu_connected = socket_connected(OrderPackets::pcu_tcp);
+#endif
+#ifdef ENABLE_LCU
     VCU::lcu_connected = socket_connected(OrderPackets::lcu_tcp);
+#endif
     VCU::required_peers_connected =
         VCU::control_station_connected && required_remote_peers_connected();
 #endif
 
 #ifdef ADJ_COMMIT_VALIDATION
+#ifdef ENABLE_HVBMS
     bool hvbms_just_connected = VCU::hvbms_connected && !VCU::hvbms_was_connected;
+#endif
+#ifdef ENABLE_PCU
     bool pcu_just_connected = VCU::pcu_connected && !VCU::pcu_was_connected;
+#endif
+#ifdef ENABLE_LCU
     bool lcu_just_connected = VCU::lcu_connected && !VCU::lcu_was_connected;
+#endif
 #endif
 
     if (VCU::control_station_connected && !VCU::control_station_was_connected) {
@@ -187,43 +215,61 @@ inline void refresh_connections() {
         "Control station disconnected"
     );
 #ifndef SINGLE
+#ifdef ENABLE_HVBMS
     handle_connection_change(
         VCU::hvbms_connected,
         VCU::hvbms_was_connected,
         "HVBMS",
         "HVBMS disconnected"
     );
+#endif
+#ifdef ENABLE_PCU
     handle_connection_change(VCU::pcu_connected, VCU::pcu_was_connected, "PCU", "PCU disconnected");
+#endif
+#ifdef ENABLE_LCU
     handle_connection_change(VCU::lcu_connected, VCU::lcu_was_connected, "LCU", "LCU disconnected");
+#endif
 
 #ifdef ADJ_COMMIT_VALIDATION
     if (RemoteBoards::adj_hash_verified) {
+#ifdef ENABLE_HVBMS
         if (hvbms_just_connected) {
             RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
             send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::adj_hash_order, "ADJ hash to HVBMS");
         }
+#endif
+#ifdef ENABLE_PCU
         if (pcu_just_connected) {
             RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
             send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to PCU");
         }
+#endif
+#ifdef ENABLE_LCU
         if (lcu_just_connected) {
             RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
             send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to LCU");
         }
+#endif
 
         if (!RemoteBoards::adj_hashes_sent) {
+#ifdef ENABLE_HVBMS
             if (VCU::hvbms_connected) {
                 RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
                 send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::adj_hash_order, "ADJ hash to HVBMS");
             }
+#endif
+#ifdef ENABLE_PCU
             if (VCU::pcu_connected) {
                 RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
                 send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to PCU");
             }
+#endif
+#ifdef ENABLE_LCU
             if (VCU::lcu_connected) {
                 RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
                 send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to LCU");
             }
+#endif
             RemoteBoards::adj_hashes_sent = true;
         }
     }
@@ -309,21 +355,53 @@ inline void cancel_verification() {
 inline bool verify_remote_states(DataPackets::state target) {
     switch (target) {
     case DataPackets::state::Precharging:
+#ifdef ENABLE_HVBMS
         return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Precharging;
+#else
+        return true;
+#endif
     case DataPackets::state::HVActive:
+#ifdef ENABLE_HVBMS
         return RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Energized;
+#else
+        return true;
+#endif
     case DataPackets::state::Propulsion:
+#ifdef ENABLE_PCU
         return RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
+#else
+        return true;
+#endif
     case DataPackets::state::Static_Levitation:
+#ifdef ENABLE_LCU
         return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating;
-    case DataPackets::state::Dynamic_Levitation:
-        return RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating &&
-               RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
-    case DataPackets::state::Connected:
-        return (RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Idle ||
-                RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Ready_To_Precharge) &&
-               RemoteBoards::pcu_state == RemoteBoards::PCU_State::Idle &&
-               RemoteBoards::lcu_state == RemoteBoards::LCU_State::Idle;
+#else
+        return true;
+#endif
+    case DataPackets::state::Dynamic_Levitation: {
+        bool ok = true;
+#ifdef ENABLE_LCU
+        ok = ok && RemoteBoards::lcu_state == RemoteBoards::LCU_State::Levitating;
+#endif
+#ifdef ENABLE_PCU
+        ok = ok && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Accelerating;
+#endif
+        return ok;
+    }
+    case DataPackets::state::Connected: {
+        bool ok = true;
+#ifdef ENABLE_HVBMS
+        ok = ok && (RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Idle ||
+                    RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Ready_To_Precharge);
+#endif
+#ifdef ENABLE_PCU
+        ok = ok && RemoteBoards::pcu_state == RemoteBoards::PCU_State::Idle;
+#endif
+#ifdef ENABLE_LCU
+        ok = ok && RemoteBoards::lcu_state == RemoteBoards::LCU_State::Idle;
+#endif
+        return ok;
+    }
     default:
         return true;
     }
@@ -343,6 +421,7 @@ inline bool needs_remote_verification(DataPackets::state target) {
     }
 }
 
+#ifdef ENABLE_HVBMS
 inline const char* hvbms_state_name(RemoteBoards::HVBMS_State s) {
     switch (s) {
     case RemoteBoards::HVBMS_State::Connecting:
@@ -361,7 +440,9 @@ inline const char* hvbms_state_name(RemoteBoards::HVBMS_State s) {
         return "Unknown";
     }
 }
+#endif
 
+#ifdef ENABLE_PCU
 inline const char* pcu_state_name(RemoteBoards::PCU_State s) {
     switch (s) {
     case RemoteBoards::PCU_State::Connecting:
@@ -376,7 +457,9 @@ inline const char* pcu_state_name(RemoteBoards::PCU_State s) {
         return "Unknown";
     }
 }
+#endif
 
+#ifdef ENABLE_LCU
 inline const char* lcu_state_name(RemoteBoards::LCU_State s) {
     switch (s) {
     case RemoteBoards::LCU_State::Connecting:
@@ -395,49 +478,74 @@ inline const char* lcu_state_name(RemoteBoards::LCU_State s) {
         return "Unknown";
     }
 }
+#endif
 
 inline const char* verification_fault_reason(DataPackets::state target) {
     static char buffer[128];
     switch (target) {
     case DataPackets::state::Precharging:
+#ifdef ENABLE_HVBMS
         snprintf(
             buffer,
             sizeof(buffer),
             "HVBMS expected Precharging, got %s",
             hvbms_state_name(RemoteBoards::hvbms_sm_state)
         );
+#else
+        snprintf(buffer, sizeof(buffer), "Precharging verification failed (board disabled)");
+#endif
         break;
     case DataPackets::state::HVActive:
+#ifdef ENABLE_HVBMS
         snprintf(
             buffer,
             sizeof(buffer),
             "HVBMS expected Energized, got %s",
             hvbms_state_name(RemoteBoards::hvbms_sm_state)
         );
+#else
+        snprintf(buffer, sizeof(buffer), "HVActive verification failed (board disabled)");
+#endif
         break;
     case DataPackets::state::Propulsion:
+#ifdef ENABLE_PCU
         snprintf(
             buffer,
             sizeof(buffer),
             "PCU expected Accelerating, got %s",
             pcu_state_name(RemoteBoards::pcu_state)
         );
+#else
+        snprintf(buffer, sizeof(buffer), "Propulsion verification failed (board disabled)");
+#endif
         break;
     case DataPackets::state::Static_Levitation:
+#ifdef ENABLE_LCU
         snprintf(
             buffer,
             sizeof(buffer),
             "LCU expected Levitating, got %s",
             lcu_state_name(RemoteBoards::lcu_state)
         );
+#else
+        snprintf(buffer, sizeof(buffer), "Static levitation verification failed (board disabled)");
+#endif
         break;
     case DataPackets::state::Dynamic_Levitation:
         snprintf(
             buffer,
             sizeof(buffer),
             "LCU expected Levitating got %s, PCU expected Accelerating got %s",
+#ifdef ENABLE_LCU
             lcu_state_name(RemoteBoards::lcu_state),
+#else
+            "(board disabled)",
+#endif
+#ifdef ENABLE_PCU
             pcu_state_name(RemoteBoards::pcu_state)
+#else
+            "(board disabled)"
+#endif
         );
         break;
     case DataPackets::state::Connected:
@@ -445,9 +553,21 @@ inline const char* verification_fault_reason(DataPackets::state target) {
             buffer,
             sizeof(buffer),
             "HVBMS expected Idle got %s, PCU expected Idle got %s, LCU expected Idle got %s",
+#ifdef ENABLE_HVBMS
             hvbms_state_name(RemoteBoards::hvbms_sm_state),
+#else
+            "(board disabled)",
+#endif
+#ifdef ENABLE_PCU
             pcu_state_name(RemoteBoards::pcu_state),
+#else
+            "(board disabled)",
+#endif
+#ifdef ENABLE_LCU
             lcu_state_name(RemoteBoards::lcu_state)
+#else
+            "(board disabled)"
+#endif
         );
         break;
     default:
@@ -593,10 +713,12 @@ inline void handle_connected_orders() {
 
     if (OrderPackets::Precharge_flag) {
         OrderPackets::Precharge_flag = false;
+#ifdef ENABLE_HVBMS
         if (RemoteBoards::hvbms_sm_state != RemoteBoards::HVBMS_State::Ready_To_Precharge) {
             WARNING("Cannot precharge: HVBMS not ready to precharge");
             return;
         }
+#endif
         transition_to(DataPackets::state::Precharging);
         return;
     }
@@ -610,7 +732,7 @@ inline void handle_precharging() {
     if (VCU::contactors_closed) {
         transition_to(DataPackets::state::HVActive);
     }
-#else
+#elif defined(ENABLE_HVBMS)
     if (RemoteBoards::hvbms_sm_state == RemoteBoards::HVBMS_State::Energized) {
         transition_to(DataPackets::state::HVActive);
     }

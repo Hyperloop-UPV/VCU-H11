@@ -16,6 +16,7 @@ void keepalive_timeout_trigger();
 
 namespace RemoteBoards {
 
+#ifdef ENABLE_HVBMS
 enum class HVBMS_State : uint8_t {
     Connecting = 0,
     Idle = 1,
@@ -24,14 +25,18 @@ enum class HVBMS_State : uint8_t {
     Energized = 4,
     Fault = 5,
 };
+#endif
 
+#ifdef ENABLE_PCU
 enum class PCU_State : uint8_t {
     Connecting = 0,
     Idle = 1,
     Accelerating = 2,
     Fault = 3,
 };
+#endif
 
+#ifdef ENABLE_LCU
 enum class LCU_State : uint8_t {
     Connecting = 0,
     Idle = 1,
@@ -40,12 +45,20 @@ enum class LCU_State : uint8_t {
     Debug = 4,
     Fault = 5,
 };
+#endif
 
+#ifdef ENABLE_HVBMS
 inline HVBMS_State hvbms_sm_state = HVBMS_State::Connecting;
+#endif
+#ifdef ENABLE_PCU
 inline PCU_State pcu_state = PCU_State::Connecting;
+#endif
+#ifdef ENABLE_LCU
 inline LCU_State lcu_state = LCU_State::Connecting;
 inline LCU_State lcu_slave_state = LCU_State::Connecting;
+#endif
 
+#ifdef ENABLE_HVBMS
 inline float hvbms_voltage_min = 0.0f;
 inline float hvbms_voltage_max = 0.0f;
 inline float hvbms_temp_min = 0.0f;
@@ -53,13 +66,16 @@ inline float hvbms_temp_max = 0.0f;
 inline float hvbms_current_reading = 0.0f;
 inline float hvbms_voltage_reading = 0.0f;
 inline float hvbms_batteries_voltage = 0.0f;
+#endif
 
 inline float propulsion_target_speed = 0.0f;
 inline float propulsion_max_current = 0.0f;
 inline float levitation_target_height = 0.0f;
 
+#ifdef ENABLE_PCU
 inline float pcu_start_svpwm_vref = 0.0f;
 inline float pcu_start_svpwm_vmax = 0.0f;
+#endif
 
 inline void reset_control_params() {
     propulsion_target_speed = 0.0f;
@@ -67,14 +83,21 @@ inline void reset_control_params() {
     levitation_target_height = 0.0f;
 }
 
+#ifdef ENABLE_HVBMS
 inline HeapOrder* Precharge_to_hvbms_order = nullptr;
 inline HeapOrder* Open_contactors_to_hvbms_order = nullptr;
+inline HeapOrder* read_bcm_faults = nullptr;
+#endif
 
+#ifdef ENABLE_PCU
 inline HeapOrder* Stop_Motor_to_pcu_order = nullptr;
 inline HeapOrder* Start_SVPWM_to_pcu_order = nullptr;
+#endif
 
+#ifdef ENABLE_LCU
 inline HeapOrder* Stop_to_lcu_order = nullptr;
 inline HeapOrder* Levitate_to_lcu_order = nullptr;
+#endif
 
 #ifdef CUSTOM_KEEPALIVE
 inline uint16_t keepalive_timeout_id = Scheduler::INVALID_ID;
@@ -90,6 +113,7 @@ inline HeapOrder* adj_hash_order = nullptr;
 #endif
 
 inline void init_remote_state_receivers() {
+#ifdef ENABLE_HVBMS
     new HeapPacket(
         static_cast<uint16_t>(950),
         &hvbms_voltage_min,
@@ -101,11 +125,17 @@ inline void init_remote_state_receivers() {
         &hvbms_batteries_voltage,
         &hvbms_sm_state
     );
+#endif
+#ifdef ENABLE_PCU
     new HeapPacket(static_cast<uint16_t>(553), &pcu_state);
+#endif
+#ifdef ENABLE_LCU
     new HeapPacket(static_cast<uint16_t>(9520), &lcu_state, &lcu_slave_state);
+#endif
 }
 
 inline void init_remote_orders() {
+#ifdef ENABLE_HVBMS
     Precharge_to_hvbms_order = new HeapOrder(
         903,
         +[]() {}
@@ -114,7 +144,13 @@ inline void init_remote_orders() {
         901,
         +[]() {}
     );
+    read_bcm_faults = new HeapOrder(
+        904,
+        +[]() {}
+    );
+#endif
 
+#ifdef ENABLE_PCU
     Start_SVPWM_to_pcu_order = new HeapOrder(
         507,
         +[]() {},
@@ -127,7 +163,9 @@ inline void init_remote_orders() {
         508,
         +[]() {}
     );
+#endif
 
+#ifdef ENABLE_LCU
     Levitate_to_lcu_order = new HeapOrder(
         9010,
         +[]() {},
@@ -137,6 +175,7 @@ inline void init_remote_orders() {
         9000,
         +[]() {}
     );
+#endif
 
 #ifdef CUSTOM_KEEPALIVE
     keepalive_order = new HeapOrder(1, +[]() {
