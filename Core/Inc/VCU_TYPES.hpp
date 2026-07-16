@@ -161,7 +161,6 @@ inline bool sdc_closed = false;
 inline DataPackets::brakes_status brakes_status = DataPackets::brakes_status::BRAKED;
 inline bool brakes_unbraked = false;
 inline bool contactors_closed = false;
-inline bool active_brakes = true;
 inline bool recovery_requested = false;
 inline bool electrovalve_enabled = false;
 inline bool control_station_connected = false;
@@ -189,7 +188,6 @@ inline constexpr auto brakes_unbraked_protection =
     Protections::protection<"brakes_unbraked", brakes_unbraked>(Protections::Rules::equals(true));
 
 inline void engage_brake() {
-    active_brakes = true;
     if (electrovalve != nullptr) {
         electrovalve->turn_off();
     }
@@ -197,7 +195,6 @@ inline void engage_brake() {
 }
 
 inline void release_brake() {
-    active_brakes = false;
     if (electrovalve != nullptr) {
         electrovalve->turn_on();
     }

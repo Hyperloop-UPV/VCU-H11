@@ -88,11 +88,6 @@ context:
       access: read_write
       initial_value: false
 
-    - name: active_brakes
-      type: bool
-      access: read_write
-      initial_value: true
-
     - name: hvbms_state
       type: uint8_t
       access: read
@@ -270,13 +265,9 @@ guards:
 actions:
   - name: brake
     function: action_brake
-    modifies:
-      - active_brakes
 
   - name: unbrake
     function: action_unbrake
-    modifies:
-      - active_brakes
 
   - name: open_contactors
     function: action_open_contactors
