@@ -193,7 +193,7 @@ inline void engage_brake() {
     if (electrovalve != nullptr) {
         electrovalve->turn_off();
     }
-    electrovalve_enabled = true;
+    electrovalve_enabled = false;
 }
 
 inline void release_brake() {
@@ -201,7 +201,7 @@ inline void release_brake() {
     if (electrovalve != nullptr) {
         electrovalve->turn_on();
     }
-    electrovalve_enabled = false;
+    electrovalve_enabled = true;
 }
 
 inline void request_open_contactors() {
