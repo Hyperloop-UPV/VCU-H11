@@ -30,7 +30,7 @@ else()
   set(PYTHON_FOR_TOOLS "${Python3_EXECUTABLE}")
 endif()
 
-option(USE_ETHERNET "Enable ethernet peripheral" OFF)
+option(USE_ETHERNET "Enable ethernet peripheral" ON)
 option(SINGLE "Build VCU for single-board testing without remote-board sockets" OFF)
 option(TARGET_NUCLEO "Targets the STM32H723 Nucleo development board" OFF)
 option(DISABLE_BRAKE_UNBRAKED_PROTECTION "Temporarily disable brakes unbraked protection for bench testing" ON)

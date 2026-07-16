@@ -194,7 +194,7 @@ inline constexpr auto brakes_unbraked_protection =
 inline void engage_brake() {
     active_brakes = true;
     if (electrovalve != nullptr) {
-        electrovalve->turn_on();
+        electrovalve->turn_off();
     }
     electrovalve_enabled = true;
 }
@@ -202,7 +202,7 @@ inline void engage_brake() {
 inline void release_brake() {
     active_brakes = false;
     if (electrovalve != nullptr) {
-        electrovalve->turn_off();
+        electrovalve->turn_on();
     }
     electrovalve_enabled = false;
 }
