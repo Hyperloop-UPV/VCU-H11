@@ -193,16 +193,18 @@ inline constexpr auto brakes_unbraked_protection =
 
 inline void engage_brake() {
     active_brakes = true;
-    if (brake_reset != nullptr) {
-        brake_reset->turn_off();
+    if (electrovalve != nullptr) {
+        electrovalve->turn_on();
     }
+    electrovalve_enabled = true;
 }
 
 inline void release_brake() {
     active_brakes = false;
-    if (brake_reset != nullptr) {
-        brake_reset->turn_on();
+    if (electrovalve != nullptr) {
+        electrovalve->turn_off();
     }
+    electrovalve_enabled = false;
 }
 
 inline void request_open_contactors() {
@@ -236,10 +238,6 @@ inline void on_fault_enter() {
     if (cooling_pump_2 != nullptr) {
         cooling_pump_2->turn_off();
     }
-    if (electrovalve != nullptr) {
-        electrovalve->turn_off();
-    }
-    electrovalve_enabled = false;
     contactors_closed = false;
     engage_brake();
     request_open_contactors();
