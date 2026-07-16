@@ -182,14 +182,11 @@ inline SensorInterrupt sdc_closed_sensor;
 inline NTC ntc_temperature_1_sensor;
 inline NTC ntc_temperature_2_sensor;
 
-inline constexpr auto sdc_closed_protection = Protections::protection<"SDC", sdc_closed>(
-    Protections::Rules::equals(false)
-);
+inline constexpr auto sdc_closed_protection =
+    Protections::protection<"SDC", sdc_closed>(Protections::Rules::equals(false));
 
 inline constexpr auto brakes_unbraked_protection =
-    Protections::protection<"brakes_unbraked", brakes_unbraked>(
-        Protections::Rules::equals(true)
-    );
+    Protections::protection<"brakes_unbraked", brakes_unbraked>(Protections::Rules::equals(true));
 
 inline void engage_brake() {
     active_brakes = true;

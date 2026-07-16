@@ -178,27 +178,39 @@ inline void init_remote_orders() {
 #endif
 
 #ifdef CUSTOM_KEEPALIVE
-    keepalive_order = new HeapOrder(1, +[]() {
-        if (keepalive_timeout_id != Scheduler::INVALID_ID) {
-            Scheduler::cancel_timeout(keepalive_timeout_id);
+    keepalive_order = new HeapOrder(
+        1,
+        +[]() {
+            if (keepalive_timeout_id != Scheduler::INVALID_ID) {
+                Scheduler::cancel_timeout(keepalive_timeout_id);
+            }
+            keepalive_timeout_id = Scheduler::set_timeout(
+                100'000,
+                +[]() { keepalive_timeout_trigger(); }
+            );
         }
-        keepalive_timeout_id = Scheduler::set_timeout(100'000, +[]() {
-            keepalive_timeout_trigger();
-        });
-    });
+    );
 #endif
 
 #ifdef ADJ_COMMIT_VALIDATION
-    adj_commit_hash_value = strtoull(ADJ_COMMIT_HASH, nullptr, 16);
-    adj_hash_order = new HeapOrder(65535, +[]() {
-        if (adj_hash_on_wire != adj_commit_hash_value) {
-            if (!FaultController::is_faulted()) {
-                FAULT("ADJ hashes don't match");
+    adj_commit_hash_value =
+        ((uint64_t)ADJ_COMMIT_HASH[0]) | ((uint64_t)ADJ_COMMIT_HASH[1] << 8) |
+        ((uint64_t)ADJ_COMMIT_HASH[2] << 16) | ((uint64_t)ADJ_COMMIT_HASH[3] << 24) |
+        ((uint64_t)ADJ_COMMIT_HASH[4] << 32) | ((uint64_t)ADJ_COMMIT_HASH[5] << 40) |
+        ((uint64_t)ADJ_COMMIT_HASH[6] << 48) | ((uint64_t)ADJ_COMMIT_HASH[7] << 56);
+    adj_hash_order = new HeapOrder(
+        65535,
+        +[]() {
+            if (adj_hash_on_wire != adj_commit_hash_value) {
+                if (!FaultController::is_faulted()) {
+                    FAULT("ADJ hashes don't match");
+                }
+            } else {
+                adj_hash_verified = true;
             }
-        } else {
-            adj_hash_verified = true;
-        }
-    }, &adj_hash_on_wire);
+        },
+        &adj_hash_on_wire
+    );
 #endif
 }
 

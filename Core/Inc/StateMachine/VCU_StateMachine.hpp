@@ -34,9 +34,8 @@ inline void sample_inputs() {
 
     if (VCU::brakes_status_input != nullptr) {
         bool pin_set = VCU::brakes_status_input->read() == GPIO_PIN_SET;
-        VCU::brakes_status = pin_set
-            ? DataPackets::brakes_status::UNBRAKED
-            : DataPackets::brakes_status::BRAKED;
+        VCU::brakes_status =
+            pin_set ? DataPackets::brakes_status::UNBRAKED : DataPackets::brakes_status::BRAKED;
         VCU::brakes_unbraked = pin_set;
     }
 }
@@ -202,9 +201,10 @@ inline void refresh_connections() {
         if (RemoteBoards::keepalive_timeout_id != Scheduler::INVALID_ID) {
             Scheduler::cancel_timeout(RemoteBoards::keepalive_timeout_id);
         }
-        RemoteBoards::keepalive_timeout_id = Scheduler::set_timeout(100'000, +[]() {
-            keepalive_timeout_trigger();
-        });
+        RemoteBoards::keepalive_timeout_id = Scheduler::set_timeout(
+            100'000,
+            +[]() { keepalive_timeout_trigger(); }
+        );
 #endif
     }
 
@@ -235,19 +235,31 @@ inline void refresh_connections() {
 #ifdef ENABLE_HVBMS
         if (hvbms_just_connected) {
             RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
-            send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::adj_hash_order, "ADJ hash to HVBMS");
+            send_remote_order(
+                OrderPackets::hvbms_tcp,
+                RemoteBoards::adj_hash_order,
+                "ADJ hash to HVBMS"
+            );
         }
 #endif
 #ifdef ENABLE_PCU
         if (pcu_just_connected) {
             RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
-            send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to PCU");
+            send_remote_order(
+                OrderPackets::pcu_tcp,
+                RemoteBoards::adj_hash_order,
+                "ADJ hash to PCU"
+            );
         }
 #endif
 #ifdef ENABLE_LCU
         if (lcu_just_connected) {
             RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
-            send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to LCU");
+            send_remote_order(
+                OrderPackets::lcu_tcp,
+                RemoteBoards::adj_hash_order,
+                "ADJ hash to LCU"
+            );
         }
 #endif
 
@@ -255,19 +267,31 @@ inline void refresh_connections() {
 #ifdef ENABLE_HVBMS
             if (VCU::hvbms_connected) {
                 RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
-                send_remote_order(OrderPackets::hvbms_tcp, RemoteBoards::adj_hash_order, "ADJ hash to HVBMS");
+                send_remote_order(
+                    OrderPackets::hvbms_tcp,
+                    RemoteBoards::adj_hash_order,
+                    "ADJ hash to HVBMS"
+                );
             }
 #endif
 #ifdef ENABLE_PCU
             if (VCU::pcu_connected) {
                 RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
-                send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to PCU");
+                send_remote_order(
+                    OrderPackets::pcu_tcp,
+                    RemoteBoards::adj_hash_order,
+                    "ADJ hash to PCU"
+                );
             }
 #endif
 #ifdef ENABLE_LCU
             if (VCU::lcu_connected) {
                 RemoteBoards::adj_hash_on_wire = RemoteBoards::adj_commit_hash_value;
-                send_remote_order(OrderPackets::lcu_tcp, RemoteBoards::adj_hash_order, "ADJ hash to LCU");
+                send_remote_order(
+                    OrderPackets::lcu_tcp,
+                    RemoteBoards::adj_hash_order,
+                    "ADJ hash to LCU"
+                );
             }
 #endif
             RemoteBoards::adj_hashes_sent = true;
@@ -640,8 +664,8 @@ inline void reject_order(bool& flag, const char* message) {
 
 inline void handle_connection_transition() {
 #ifdef ADJ_COMMIT_VALIDATION
-    if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected
-        && RemoteBoards::adj_hash_verified) {
+    if (is_state(DataPackets::state::Idle) && VCU::required_peers_connected &&
+        RemoteBoards::adj_hash_verified) {
 #ifdef SINGLE
         transition_to(DataPackets::state::Connected);
 #else
