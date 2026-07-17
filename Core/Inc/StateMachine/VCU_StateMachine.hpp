@@ -130,7 +130,7 @@ inline void stop_levitation() {
 
 inline void start_propulsion() {
 #if !defined(SINGLE) && defined(ENABLE_PCU)
-    send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::Start_SVPWM_to_pcu_order, "propulsion");
+    send_remote_order(OrderPackets::pcu_tcp, RemoteBoards::current_control_order, "propulsion");
 #endif
 }
 

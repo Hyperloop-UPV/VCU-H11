@@ -77,7 +77,7 @@ inline float pcu_start_svpwm_vmax = 0.0f;
 #endif
 
 inline void reset_control_params() {
-    propulsion_current_reference= 0.0f;
+    propulsion_current_reference = 0.0f;
     levitation_target_height = 0.0f;
 }
 
@@ -89,7 +89,10 @@ inline HeapOrder* read_bcm_faults = nullptr;
 
 #ifdef ENABLE_PCU
 inline HeapOrder* Stop_Motor_to_pcu_order = nullptr;
-inline HeapOrder* Start_SVPWM_to_pcu_order = nullptr;
+inline HeapOrder* current_control_order = nullptr;
+inline float current_control_start_ref = 0.0f;
+inline float current_control_max_current = 30000.0f;
+inline bool current_control_enable = true;
 #endif
 
 #ifdef ENABLE_LCU
@@ -152,11 +155,11 @@ inline void init_remote_orders() {
     current_control_order = new HeapOrder(
         509,
         +[]() {},
-        0,
-        30000,
+        &current_control_start_ref,
+        &current_control_max_current,
         &propulsion_current_reference,
         &hvbms_current_reading,
-        true
+        &current_control_enable
     );
     Stop_Motor_to_pcu_order = new HeapOrder(
         508,

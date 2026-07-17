@@ -4,16 +4,16 @@
 */
 extern "C"{
     // about 30 is the maximum but do 32 for alignment
-    const char COMPILATION_DATE[32] = "20260717T001226";
+    const char COMPILATION_DATE[32] = "20260717T084240";
 
     // 16 bytes because short hash is 8 bytes + null terminator + alignment
     const char STLIB_COMMIT_HASH[16] = "ababa53a";
 
     // 16 bytes because short hash is 8 bytes + null terminator + alignment
-    extern const char ADJ_COMMIT_HASH[16] = "ddf60ac1";
+    extern const char ADJ_COMMIT_HASH[16] = "9bbce1bc";
 
     // 16 bytes because short hash is 8 bytes + null terminator + alignment
-    const char BOARD_COMMIT_HASH[16] = "9cef0947";
+    const char BOARD_COMMIT_HASH[16] = "28f9ad35";
 
     const char DESCRIPTION[255]  __attribute__((section(".metadata_pool")))=
         "****************"  // placeholder for beggining
