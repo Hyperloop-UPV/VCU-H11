@@ -68,8 +68,8 @@ inline float hvbms_voltage_reading = 0.0f;
 inline float hvbms_batteries_voltage = 0.0f;
 #endif
 
-inline float propulsion_current_reference = 0.0f;
-inline float levitation_target_height = 0.0f;
+inline float propulsion_current_reference = 50.0f;
+inline float levitation_target_height = 0.0114f;
 
 #ifdef ENABLE_PCU
 inline float pcu_start_svpwm_vref = 0.0f;
@@ -77,8 +77,8 @@ inline float pcu_start_svpwm_vmax = 0.0f;
 #endif
 
 inline void reset_control_params() {
-    propulsion_current_reference = 0.0f;
-    levitation_target_height = 0.0f;
+    // propulsion_current_reference = 0.0f;
+    // levitation_target_height = 0.0f;
 }
 
 #ifdef ENABLE_HVBMS
@@ -98,6 +98,7 @@ inline bool current_control_enable = true;
 #ifdef ENABLE_LCU
 inline HeapOrder* Stop_to_lcu_order = nullptr;
 inline HeapOrder* Levitate_to_lcu_order = nullptr;
+inline HeapOrder* set_fixed_vbat_order = nullptr;
 #endif
 
 #ifdef CUSTOM_KEEPALIVE
@@ -173,6 +174,11 @@ inline void init_remote_orders() {
         +[]() {},
         &levitation_target_height
     );
+    set_fixed_vbat_order = new HeapOrder(
+        9001,
+        +[]() {},
+        &hvbms_voltage_reading
+    );
     Stop_to_lcu_order = new HeapOrder(
         9000,
         +[]() {}
@@ -187,7 +193,7 @@ inline void init_remote_orders() {
                 Scheduler::cancel_timeout(keepalive_timeout_id);
             }
             keepalive_timeout_id = Scheduler::set_timeout(
-                100'000,
+                500'000,
                 +[]() { keepalive_timeout_trigger(); }
             );
         }

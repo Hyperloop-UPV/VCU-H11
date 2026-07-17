@@ -138,6 +138,11 @@ inline void start_static_levitation() {
 #if !defined(SINGLE) && defined(ENABLE_LCU)
     send_remote_order(
         OrderPackets::lcu_tcp,
+        RemoteBoards::set_fixed_vbat_order,
+        "set fixed vbat"
+    );
+    send_remote_order(
+        OrderPackets::lcu_tcp,
         RemoteBoards::Levitate_to_lcu_order,
         "static levitation"
     );
@@ -791,6 +796,7 @@ inline void handle_ready_orders() {
         OrderPackets::Propulsion_flag = false;
         OrderPackets::Propulsion_Parameterized_flag = false;
         transition_to(DataPackets::state::Propulsion);
+        // WARNING("Propulsion is disabled");
         RemoteBoards::reset_control_params();
         return;
     }
@@ -809,6 +815,7 @@ inline void handle_ready_orders() {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
         transition_to(DataPackets::state::Dynamic_Levitation);
+        // WARNING("Dynamic levitation is disabled");
         RemoteBoards::reset_control_params();
         return;
     }
