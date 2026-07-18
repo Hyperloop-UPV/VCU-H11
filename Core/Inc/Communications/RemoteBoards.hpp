@@ -69,7 +69,7 @@ inline float hvbms_batteries_voltage = 0.0f;
 #endif
 
 inline float propulsion_current_reference = 50.0f;
-inline float levitation_target_height = 0.0114f;
+inline float levitation_target_height = 0.013f;
 
 #ifdef ENABLE_PCU
 inline float pcu_start_svpwm_vref = 0.0f;
@@ -77,8 +77,8 @@ inline float pcu_start_svpwm_vmax = 0.0f;
 #endif
 
 inline void reset_control_params() {
-    // propulsion_current_reference = 0.0f;
-    // levitation_target_height = 0.0f;
+    // propulsion_current_reference = 50.0f;
+    // levitation_target_height = 0.013f;
 }
 
 #ifdef ENABLE_HVBMS
