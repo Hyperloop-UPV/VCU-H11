@@ -795,8 +795,8 @@ inline void handle_ready_orders() {
     if (OrderPackets::Propulsion_flag || OrderPackets::Propulsion_Parameterized_flag) {
         OrderPackets::Propulsion_flag = false;
         OrderPackets::Propulsion_Parameterized_flag = false;
-        transition_to(DataPackets::state::Propulsion);
-        // WARNING("Propulsion is disabled");
+        // transition_to(DataPackets::state::Propulsion);
+        WARNING("Propulsion is disabled");
         RemoteBoards::reset_control_params();
         return;
     }
@@ -814,8 +814,8 @@ inline void handle_ready_orders() {
         OrderPackets::Dynamic_Levitation_Parameterized_flag) {
         OrderPackets::Dynamic_Levitation_flag = false;
         OrderPackets::Dynamic_Levitation_Parameterized_flag = false;
-        transition_to(DataPackets::state::Dynamic_Levitation);
-        // WARNING("Dynamic levitation is disabled");
+        // transition_to(DataPackets::state::Dynamic_Levitation);
+        WARNING("Dynamic levitation is disabled");
         RemoteBoards::reset_control_params();
         return;
     }
